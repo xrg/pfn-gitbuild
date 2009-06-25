@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set -e
+if [ ! -d .git ] ; then
+	echo "This is not a git directory"
+	exit 1
+fi
+
+if grep '\[merge "pomerge"\]' .git/config > /dev/null ; then
+	echo "POmerge already installed for this git"
+	exit 0
+fi
+
+echo 'Patching .git/config..'
+cat '-' >> .git/config << EOF
+
+[merge "pomerge"]
+        name = Merge PO files
+        driver = msgcat -o %A --use-first %A %B
+EOF
+
+echo 'Patching .git/info/attributes..'
+cat '-' >> .git/info/attributes << EOF
+*.pot   merge=pomerge
+*.po    merge=pomerge
+EOF
+
+echo 'Done'

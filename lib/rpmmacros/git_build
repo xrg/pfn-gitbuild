@@ -1,0 +1,31 @@
+#/*! \page git-related macros
+# */
+
+#override this, please!
+%git_repodir %(echo ~/build/)
+
+%git_gitdir %{git_repodir}/%{git_repo}/.git
+
+%git_get_source pushd %{git_repodir}/%{git_repo} ;\
+	/usr/bin/git archive --format=tar --prefix=%{name}-%{version}/ %{git_head} | \
+		gzip -c > %{_sourcedir}/%{name}-%{version}.tar.gz ;\
+	popd
+
+%git_clone_source if [ -d %{name}-%{version} ] ; then \
+		cd %{name}-%{version} && git pull origin %{git_head} ; \
+	else \
+		git clone %{git_gitdir} %{name}-%{version} && \
+		cd %{name}-%{version}/ ; \
+	fi
+
+%git_prep_submodules %{git_submodule} init --cloned && %{git_submodule} update
+
+#%git_get_ver %(git --git-dir=%{git_gitdir} describe  --tags | cut -f 1 -d '-')
+
+#%git_get_rel  %(git --git-dir=%{git_gitdir} describe --tags | cut -f 2 -d '-')
+#%git_get_rels %(git --git-dir=%{git_gitdir} describe --tags | cut -f 2- -d '-')
+%git_get_ver  %(git --git-dir=%{git_gitdir} describe --tags | sed 's/^v\\?\\(.*\\)-\\([0-9]\\+\\)-g.*$/\\1/;s/-//;s/^v//')
+%git_get_rel  %(git --git-dir=%{git_gitdir} describe --tags | grep '\\-g.\\+$' | sed 's/^v\\?\\(.*\\)-\\([0-9]\\+\\)-g.*$/\\2/')
+
+%git_gen_changelog(n:) git --git-dir=%{git_gitdir} log --pretty=format:'* !%cd! %cn <%ce> %h%n  + %s%n' %{-n:-n %{-n*}}%{!-n:-n 10} |\
+	 sed 's/!\\(.*\\) [0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\} \\([0-9]\\+\\) +[0-9]\\{4\\}!/\\1 \\2/' > Changelog.git.txt

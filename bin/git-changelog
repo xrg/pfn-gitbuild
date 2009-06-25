@@ -1,0 +1,23 @@
+#!/bin/bash
+
+
+# --git-dir=%{git_gitdir}
+#%{-n:-n %{-n*}}%{!-n:-n 10} 
+IFS='|'
+git  log --date=local --pretty=format:'%cd|%ci|%cn <%ce>|%an <%ae>|%h|%s' -n 40 |\
+	sed 's/^[^ ]\+ \([^|]*\)|\([^ ]\{10\}\) [^|]*|/\1|\2|/' |
+	while read TSTAMP DATE COMMITER AUTHOR HASH MESSAGE ; do
+	if [ "$DATE" != "$OLD_DATE" ] || [ "$COMMITER" != "$OLD_COM" ] ; then
+	   echo
+	   echo "+ $TSTAMP $COMMITER $HASH"
+	fi
+	OLD_DATE="$DATE"
+	OLD_COM="$COMMITER"
+	if [ "$AUTHOR" != "$COMMITER" ] ; then
+		echo "  * $MESSAGE ($AUTHOR)"
+	else
+		echo "  * $MESSAGE"
+	fi
+	done
+	 #sed 's/!\(.*\) [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\} \([0-9]\+\) +[0-9]\{4\}!/\1 \2/' 
+	 #> Changelog.git.txt
