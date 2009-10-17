@@ -6,26 +6,34 @@
 
 %git_gitdir %{git_repodir}/%{git_repo}/.git
 
-%git_get_source pushd %{git_repodir}/%{git_repo} ;\
+%git_get_source if [ -d %{git_gitdir} ] ; then \
+	pushd %{git_repodir}/%{git_repo} ;\
 	/usr/bin/git archive --format=tar --prefix=%{name}-%{version}/ %{git_head} | \
 		gzip -c > %{_sourcedir}/%{name}-%{version}.tar.gz ;\
-	popd
+	popd ; \
+	gitrpm-changelog -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} ;\
+	fi
 
 %git_clone_source if [ -d %{name}-%{version} ] ; then \
 		cd %{name}-%{version} && git pull origin %{git_head} ; \
 	else \
 		git clone %{git_gitdir} %{name}-%{version} && \
 		cd %{name}-%{version}/ ; \
-	fi
+		git checkout -f %{git_head} ;\
+	fi ; \
+	gitrpm-changelog -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir}
 
 %git_prep_submodules %{git_submodule} init --cloned && %{git_submodule} update
 
-#%git_get_ver %(git --git-dir=%{git_gitdir} describe  --tags | cut -f 1 -d '-')
+#%git_get_ver  %(git --git-dir=%{git_gitdir} describe --tags | sed 's/^v\\?\\(.*\\)-\\([0-9]\\+\\)-g.*$/\\1/;s/-//;s/^v//')
+#%git_get_rel  %(git --git-dir=%{git_gitdir} describe --tags | grep '\\-g.\\+$' | sed 's/^v\\?\\(.*\\)-\\([0-9]\\+\\)-g.*$/\\2/')
 
-#%git_get_rel  %(git --git-dir=%{git_gitdir} describe --tags | cut -f 2 -d '-')
-#%git_get_rels %(git --git-dir=%{git_gitdir} describe --tags | cut -f 2- -d '-')
-%git_get_ver  %(git --git-dir=%{git_gitdir} describe --tags | sed 's/^v\\?\\(.*\\)-\\([0-9]\\+\\)-g.*$/\\1/;s/-//;s/^v//')
-%git_get_rel  %(git --git-dir=%{git_gitdir} describe --tags | grep '\\-g.\\+$' | sed 's/^v\\?\\(.*\\)-\\([0-9]\\+\\)-g.*$/\\2/')
+# These won't work, because they are evaluated before the git_get_source.
+#git_get_ver %(grep '^Version:' %{_sourcedir}/%{name}-gitrpm.version | cut -f 2)
+#git_get_rel %(grep '^Release:' %{_sourcedir}/%{name}-gitrpm.version | cut -f 2)
 
-%git_gen_changelog(n:) git --git-dir=%{git_gitdir} log --pretty=format:'* !%cd! %cn <%ce> %h%n  + %s%n' %{-n:-n %{-n*}}%{!-n:-n 10} |\
-	 sed 's/!\\(.*\\) [0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\} \\([0-9]\\+\\) +[0-9]\\{4\\}!/\\1 \\2/' > Changelog.git.txt
+%git_get_ver %(gitrpm-version.sh -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} -b Version)
+%git_get_rel %(gitrpm-version.sh -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} -B Release)
+
+
+#eof
