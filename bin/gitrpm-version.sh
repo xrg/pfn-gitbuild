@@ -47,7 +47,8 @@ done
 	
 
 if [ "$GET_ONLY" != "y" ] ; then
-	if ! VERSION_STRING=$(git --git-dir="$GITDIR" describe --tags "$GIT_HEAD") ; then
+	if ! VERSION_STRING=$(git --git-dir="$GITDIR" describe --tags --match 'v[0-9]*.[0-9]' "$GIT_HEAD") ; then
+		echo "There must be a tag in the form 'v0.1[.5]' for each version to consider." >&2
 		exit 1
 	fi
 
