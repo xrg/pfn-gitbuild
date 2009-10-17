@@ -35,5 +35,9 @@
 %git_get_ver %(gitrpm-version.sh -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} -b Version)
 %git_get_rel %(gitrpm-version.sh -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} -B Release)
 
+%git_bs_source(:) %(if [ ! -e %{_sourcedir}/%1 ] ; then \
+	echo "Bootstrap" %1 >&2 ; \
+	echo | gzip -c > %{_sourcedir}/%1; \
+	fi ) %1
 
 #eof
