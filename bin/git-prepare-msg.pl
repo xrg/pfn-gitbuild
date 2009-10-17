@@ -26,10 +26,34 @@ while (<infile>){
 
 my @modsChanged;
 if (open(din,"-|","git diff --cached" ) ){
+	while(<din>){
+		chomp;
+		if (! /^diff /) { next ; }
+		$_ = <din> ;
+		
+		# Only consider submodule (by attrs) changes
+		if (! /^index [^ ]* 16000/) { next ; }
+		$_ = <din>;
+		if (! /^--- a\// ) {
+			next;
+		}
+		$_ = <din>;
+		if (! /^\+\+\+ b\/(.*)$/ ){
+			next;
+		}
+		my $submod = $1;
+		push(@modsChanged,$submod);
+	}
+	print outfile "Updated submodules ".join(", ",@modsChanged);
+	print outfile "\n\n";
+	close(din);
+}else {
+ warn("Cannot open git diff: $!");
+}
 
-	print outfile "# Our addition goes here!\n";
+if (open(din,"-|","git diff --cached" ) ){
+	print outfile "# Detailed diff of submodules:\n";
 
-	my $i=0;
 	while(<din>){
 		chomp;
 		if (! /^diff /) { next ; }
@@ -48,7 +72,7 @@ if (open(din,"-|","git diff --cached" ) ){
 			next;
 		}
 		my $submod = $1;
-		push(@modschanged,$submod);
+		push(@modsChanged,$submod);
 		
 		$_ = <din>;
 		$_ = <din>;
@@ -78,7 +102,6 @@ if (open(din,"-|","git diff --cached" ) ){
 		}
 
 	}
-
 	close(din);
 }else {
  warn("Cannot open git diff: $!");
