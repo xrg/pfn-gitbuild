@@ -37,7 +37,7 @@ done
 IFS='|'
 git --git-dir="$GITDIR" log --date=local \
 	--pretty=format:'%cd|%ci|%cn <%ce>|%an <%ae>|%h|%s' \
-	-n $NUM_CHANGES "$GIT_HEAD" |\
+	-n $NUM_CHANGES "$GIT_HEAD" -- |\
 	sed 's/^\([^|]\{7\} [0-9]\{1,2\}\) [0-9\:]* \([^|]*\)|\([^ ]\{10\}\) [^|]*|/\1 \2|\3|/' |
 	while read TSTAMP DATE COMMITER AUTHOR HASH MESSAGE ; do
 	#DATE=$(echo $DATE | sed 's/

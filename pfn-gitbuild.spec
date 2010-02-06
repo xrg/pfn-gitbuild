@@ -20,7 +20,7 @@ Source1:	%{name}-gitrpm.version
 Source2:	%{name}-changelog.gitrpm.txt
 
 #BuildRequires:	gettext
-Requires(pre): rpmbuild
+Requires(pre): rpm-build
 %if %{_target_vendor} == redhat
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-buildroot
 %endif
