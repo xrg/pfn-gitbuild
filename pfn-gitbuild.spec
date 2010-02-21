@@ -59,8 +59,8 @@ install lib/rpmmacros/* %{buildroot}%{_sys_macros_dir}
 
 %files
 %defattr(-,root,root)
-%config(noreplace)	%{_sys_macros_dir}/*
-%attr(0755,root,backup)	%{_bindir}/*
+                  %{_sys_macros_dir}/*
+%attr(0755,root,backup)  %{_bindir}/*
 
 %changelog -f %{_sourcedir}/%{name}-changelog.gitrpm.txt
 
