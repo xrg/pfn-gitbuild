@@ -14,6 +14,14 @@
 	gitrpm-changelog -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} ;\
 	fi
 
+%git_get_source_sm if [ -d %{git_gitdir} ] ; then \
+	pushd %{git_repodir}/%{git_repo} ;\
+	git-archive-sm.sh -p %{name}-%{version}/ %{git_head} %{_sourcedir}/%{name}-%{version}.tar || exit $? ;\
+	popd ; \
+	gzip -f %{_sourcedir}/%{name}-%{version}.tar ; \
+	gitrpm-changelog -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} ;\
+	fi
+
 %git_clone_source if [ -d %{name}-%{version} ] ; then \
 		cd %{name}-%{version} && git pull origin %{git_head} ; \
 	else \
