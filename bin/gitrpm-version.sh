@@ -14,6 +14,7 @@ GIT_HEAD=HEAD
 OUTDIR="."
 BOOTSTRAP=
 GET_ONLY=n
+UGLY_REGEXP='^v\?\([0-9\.]*\)\([a-z]\+[0-9]*\)-\([0-9]\+\)-g.*$'
 
 while [ -n "$1" ] ; do
 case "$1" in
@@ -55,15 +56,19 @@ if [ "$GET_ONLY" != "y" ] ; then
 	VERSION_HEAD=$(git --git-dir="$GITDIR" rev-parse "$GIT_HEAD")
 
 	VERSION_VERSION=$(echo $VERSION_STRING | \
-		sed 's/^v\?\(.*\)-\([0-9]\+\)-g.*$/\1/;s/-//;s/^v//')
+		sed "s/$UGLY_REGEXP/\1/;s/-//;s/^v//")
 
 	VERSION_RELEASE=$(echo $VERSION_STRING | \
 		grep '\-g.\+$' | \
-		sed 's/^v\?\(.*\)-\([0-9]\+\)-g.*$/\2/')
+		sed "s/$UGLY_REGEXP/\3/")
 
+	VERSION_EXTRA=$(echo $VERSION_STRING | \
+		sed "s/$UGLY_REGEXP/\2/" )
+		
 cat '-' <<EOF > "$OUTDIR"/$REPONAME-gitrpm.version
 Version: $VERSION_VERSION
 Release: $VERSION_RELEASE
+Extra: $VERSION_EXTRA
 Head: $VERSION_HEAD
 EOF
 
