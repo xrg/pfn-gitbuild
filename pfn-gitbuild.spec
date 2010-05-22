@@ -15,7 +15,7 @@ Summary:	Pefnos Git Build scripts
 Group:		Development/Other
 BuildArch:	noarch
 License:	GPL
-Source0:	%{name}-%{version}.tar.gz
+Source0:	%git_bs_source %{name}-%{version}.tar.gz
 Source1:	%{name}-gitrpm.version
 Source2:	%{name}-changelog.gitrpm.txt
 
