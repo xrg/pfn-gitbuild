@@ -14,6 +14,7 @@ GIT_HEAD=HEAD
 OUTDIR="."
 BOOTSTRAP=
 GET_ONLY=n
+DO_ZEROEXTRA=
 UGLY_REGEXP='^v\?\([0-9\.]*\)\([a-z]\+[0-9]*\)\?-\([0-9]\+\)-g.*$'
 
 while [ -n "$1" ] ; do
@@ -42,6 +43,10 @@ case "$1" in
 		BOOTSTRAP="$2"
 		GET_ONLY=y
 		shift 2
+		;;
+	-0)
+		DO_ZEROEXTRA=y
+		shift 1
 		;;
 esac
 done
@@ -81,7 +86,15 @@ if [ -n "$BOOTSTRAP" ] ; then
 		exit 2
 	fi
 
-	grep "^$BOOTSTRAP: " "$OUTDIR"/$REPONAME-gitrpm.version | cut -f 2 -d ' '
+	RESULT=$(grep "^$BOOTSTRAP: " "$OUTDIR"/$REPONAME-gitrpm.version | cut -f 2 -d ' ')
+	if [ "$DO_ZEROEXTRA" == 'y' ] ; then
+	    if [ -n "$RESULT" ] ; then
+		echo "0.$RESULT."
+	    fi
+	else
+	    echo "$RESULT"
+	fi
+	
 fi
 
 

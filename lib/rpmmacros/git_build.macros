@@ -43,9 +43,10 @@
 %git_get_ver %(gitrpm-version.sh -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} -b Version)
 %git_get_rel %(gitrpm-version.sh -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} -B Release)
 
-%git_get_relextra %(gitrpm-version.sh -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} -B Extra)
+%git_get_relextra %(gitrpm-version.sh -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} -B Extra )
+%git_get_relextra0 %(gitrpm-version.sh -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} -B Extra -0 )
 
-%git_get_rel2 %{?%{git_get_relextra}:0.%{git_get_relextra}.}%{git_get_rel}
+%git_get_rel2 %{git_get_relextra0}%{git_get_rel}
 
 %git_bs_source(:) %(if [ ! -e %{_sourcedir}/%1 ] ; then \
 	echo "Bootstrap" %1 >&2 ; \
