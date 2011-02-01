@@ -33,7 +33,7 @@
 
 %git_prep_submodules(f) %{git_submodule} init --cloned && \
     %{-f: ( %{git_submodule} foreach git checkout -f && \
-	%{git_submodule} foreach git clean -d -f || true ) && } %{git_submodule} update
+	%{git_submodule} foreach git clean -d -f -x || true ) && } %{git_submodule} update
 
 #%git_get_ver  %(git --git-dir=%{git_gitdir} describe --tags | sed 's/^v\\?\\(.*\\)-\\([0-9]\\+\\)-g.*$/\\1/;s/-//;s/^v//')
 #%git_get_rel  %(git --git-dir=%{git_gitdir} describe --tags | grep '\\-g.\\+$' | sed 's/^v\\?\\(.*\\)-\\([0-9]\\+\\)-g.*$/\\2/')

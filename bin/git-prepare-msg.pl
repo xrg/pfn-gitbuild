@@ -92,7 +92,7 @@ if (open(din,"-|","git diff --cached" ) ){
 		
 		print outfile "Submodule $submod:\n";
 		
-		if (open(spin,"-|","cd $submod ; git shortlog -ne $oldhash..$newhash" ) ){
+		if (open(spin,"-|","cd $submod ; git shortlog -nes $oldhash..$newhash" ) ){
 			my $lastline = "";
 			while (<spin>){
 				if ( /^ *\[MERGE\] *$/i ) {
