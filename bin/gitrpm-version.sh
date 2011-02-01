@@ -15,7 +15,7 @@ OUTDIR="."
 BOOTSTRAP=
 GET_ONLY=n
 DO_ZEROEXTRA=
-UGLY_REGEXP='^v\?\([0-9\.]*\)\([a-z]\+[0-9]*\)\?-\([0-9]\+\)-g.*$'
+UGLY_REGEXP='^v\?\([0-9\.]*\)-\?\([a-z]\+[0-9]*\)\?-\([0-9]\+\)-g.*$'
 
 while [ -n "$1" ] ; do
 case "$1" in
@@ -51,7 +51,6 @@ case "$1" in
 esac
 done
 	
-
 if [ "$GET_ONLY" != "y" ] && [ -d "$GITDIR" ] ; then
 	if ! VERSION_STRING=$(git --git-dir="$GITDIR" describe --tags --match 'v[0-9]*.[0-9]*' "$GIT_HEAD") ; then
 		echo "There must be a tag in the form 'v0.1[.5]' for each version to consider." >&2
