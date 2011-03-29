@@ -31,9 +31,11 @@
 	fi ; \
 	gitrpm-changelog -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir}
 
-%git_prep_submodules(f) %{git_submodule} init --cloned && \
-    %{-f: ( %{git_submodule} foreach git checkout -f && \
-	%{git_submodule} foreach git clean -d -f -x || true ) && } %{git_submodule} update
+%git_prep_submodules(f) git submodule init && \
+    %{-f: ( git submodule foreach git checkout -f && \
+        git submodule foreach git clean -d -f -x || true ) && } \
+        for SUBM in $(git config --get-regexp 'submodule\..*.url' | cut -d '.' -f 2) ; do \
+                git submodule update --reference %{git_repodir}/%{git_repo}/$SUBM $SUBM ; done
 
 #%git_get_ver  %(git --git-dir=%{git_gitdir} describe --tags | sed 's/^v\\?\\(.*\\)-\\([0-9]\\+\\)-g.*$/\\1/;s/-//;s/^v//')
 #%git_get_rel  %(git --git-dir=%{git_gitdir} describe --tags | grep '\\-g.\\+$' | sed 's/^v\\?\\(.*\\)-\\([0-9]\\+\\)-g.*$/\\2/')
