@@ -54,7 +54,7 @@
 
 %git_bs_source(:) %(if [ ! -e %{_sourcedir}/%1 ] ; then \
 	echo "Bootstrap" %1 >&2 ; \
-	echo | gzip -c > %{_sourcedir}/%1; \
+	tar -czf %{_sourcedir}/%1 --files-from=/dev/null; \
 	fi ) %1
 
 #eof
