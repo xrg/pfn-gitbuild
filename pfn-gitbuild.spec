@@ -12,9 +12,10 @@ Name:		%{name}
 Version:	%{version}
 Release:	%{release}
 Summary:	Pefnos Git Build scripts
-Group:		Development/Other
+Group:		Development/Tools
+URL:		http://git.hellug.gr/?p=xrg/gitscripts
 BuildArch:	noarch
-License:	GPL
+License:	GPLv2
 Source0:	%git_bs_source %{name}-%{version}.tar.gz
 Source1:	%{name}-gitrpm.version
 Source2:	%{name}-changelog.gitrpm.txt
@@ -45,10 +46,10 @@ SRPM file created.
 [ -n "%{buildroot}" -a "%{buildroot}" != / ] && rm -rf %{buildroot}
 
 install -d %{buildroot}%{_bindir} \
-	%{buildroot}%{_sys_macros_dir}
-	
+        %{buildroot}%{_sys_macros_dir}
+
 install bin/gitrpm-changelog bin/gitrpm-version.sh bin/git-init-pomerge  \
-	%{buildroot}%{_bindir}/
+        %{buildroot}%{_bindir}/
 install lib/rpmmacros/* %{buildroot}%{_sys_macros_dir}
 
 
@@ -58,9 +59,9 @@ install lib/rpmmacros/* %{buildroot}%{_sys_macros_dir}
 
 
 %files
-%defattr(-,root,root)
+%defattr(0644,root,root)
                   %{_sys_macros_dir}/*
-%attr(0755,root,backup)  %{_bindir}/*
+%attr(0755,root,users)  %{_bindir}/*
 
 %changelog -f %{_sourcedir}/%{name}-changelog.gitrpm.txt
 
