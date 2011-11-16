@@ -8,6 +8,8 @@
 # this will force "/usr/lib/" even on 64-bit
 %define libndir %{_exec_prefix}/lib
 
+%{?!_sys_macros_dir: %global _sys_macros_dir /etc/rpm/macros.d }
+
 Name:		%{name}
 Version:	%{version}
 Release:	%{release}
