@@ -3,6 +3,7 @@
 
 #override this, please!
 %git_repodir %(echo ~/build/)
+%git_head HEAD
 
 %git_gitdir %{git_repodir}/%{git_repo}/.git
 
