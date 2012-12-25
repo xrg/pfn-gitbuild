@@ -120,6 +120,11 @@ if True:
         if copt.configfile:
             _logger.warning("Configuration could not be read from %s", copt.configfile)
 
+class SpecContents(object):
+    """Contains an RPM spec file
+    
+        From this data structure, the same, exact, spec file should be reconstructed
+    """
 class MWorker(object):
     _name = '<base>'
     def __init__(self, parent):
@@ -157,12 +162,26 @@ class Parse_Spec(MWorker):
         to the instructions in the spec.
     """
     _name = "parse the spec file"
+    
+    def work(self):
+        fp = open(os.path.join(self._parent._svndir, self._parent._project, 'SPECS', self._parent._project + '.spec'), 'rb')
+        spec = self._parent._spec = SpecContents()
+        spec.parse_in(fp, self)
+        
 
 class Untar(MWorker):
     _name = "extract the initial source"
 
 class Git_Commit_Source(MWorker):
     _name = "commit the upstream source in git"
+class Git_Mga_branch(MWorker):
+    _name = "create a 'mageia' branch"
+    
+class Chose_Spec_Path(MWorker):
+    _name = "find the right place for the spec file"
+
+class Copy_Spec(MWorker):
+    _name = "copy the spec into the git repo"
 
 class Git_Commit_Spec(MWorker):
     _name = "commit the spec file in git"
@@ -170,12 +189,15 @@ class Git_Commit_Spec(MWorker):
 class Placeholder(MWorker):
     _name = "no op placeholder"
 
-class Gitify(MWorker):
+class Gitify_Spec(MWorker):
     _name = "gitify the spec file"
 
 class Git_Commit_Spec2(MWorker):
     _name = "commit the gitified spec"
 
+
+class Git_tag(MWorker):
+    _name = "add the versioned tag to git"
 
 class Migrator(object):
     
@@ -185,7 +207,10 @@ class Migrator(object):
         self._svndir = None
         self._gitdir = None
         self._context = {}
-        for sclass in (Set_Paths, Checkout, Git_Init, Parse_Spec):
+        self._spec = None
+        for sclass in (Set_Paths, Checkout, Git_Init, Parse_Spec, Placeholder, \
+                    Git_Mga_branch, Chose_Spec_Path, Copy_Spec, Git_Commit_Spec, \
+                    Placeholder, Gitify_Spec, Git_Commit_Spec2):
             assert issubclass(sclass, MWorker), sclass
             self._steps.append(sclass(self))
 
