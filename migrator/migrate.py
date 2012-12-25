@@ -246,6 +246,7 @@ class SpecContents(object):
                     return
                 elif hvar == 'Version':
                     self.spec_vars['version'] = self.replace_vars(hvalue).strip()
+                    self.variables['version'] = self.spec_vars['version'] # because rpm does that, too
                     section.append('Version:\t%git_get_ver\n')
                     return
                 elif hvar == 'Release':
@@ -259,7 +260,7 @@ class SpecContents(object):
                         section.append('Source:\t\t%git_bs_source %{name}-%{version}.tar.gz\n')
                         section.append('Source1:\t%{name}-gitrpm.version\n')
                         section.append('Source2:\t%{name}-changelog.gitrpm.txt\n')
-                    self._sources[src_num] = self.replace_vars(hvalue).strip()
+                    self._sources[src_num] = self.replace_vars(hvalue).strip().rsplit('/', 1)[-1]
                     return
                 elif hvar.startswith('Patch'):
                     patch_num = hvar[6:]
@@ -293,7 +294,7 @@ class SpecContents(object):
             name = None
             source = self._sources.get('', None)
             if source is None:
-                source = self.spec_vars.get('0', None)
+                source = self._sources.get('0', None)
             while args:
                 r0 = args.pop(0)
                 if not r0:
@@ -304,6 +305,7 @@ class SpecContents(object):
                     name = args.pop(0)
                 else:
                     _logger.warning("Unknown switch to %%setup: '%s'", r0)
+            assert source, "No source to extract! %r" % self._sources.keys()
             _logger.debug("Will extract source from %s, name=%s", source, name)
             self._prep_steps.append((Untar, dict(source=source, pname=name)))
             if len(self._prep_steps) == 1:
