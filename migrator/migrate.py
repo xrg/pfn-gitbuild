@@ -31,6 +31,10 @@ parser.add_option("-R", "--reset",
                   action="store_true", dest="reset", default=False,
                   help="Forget about pending migrations, start all over.")
 
+parser.add_option("--show",
+                  action="store_true", dest="show_mode", default=False,
+                  help="Don't do anything, just list the steps")
+
 # TODO: workdir?
 #parser.add_option("-p", "--port", dest="port", default=8000,
                   #help="bind to PORT", metavar="PORT")
@@ -250,6 +254,18 @@ if not copt.reset:
     except Exception:
         _logger.exception("Cannot load previous data: ")
 
+if copt.show_mode:
+    if args:
+        _logger.error("Show mode cannot have arguments!")
+        sys.exit(1)
+    for mig in migs:
+        print "Migrator: %s" % mig._project
+        print "    remaining steps:"
+        for n, s in enumerate(mig._steps):
+            print "    %2d. %s" %(n, s)
+        print
+
+    sys.exit(0)
 
 for project in args:
     try:
