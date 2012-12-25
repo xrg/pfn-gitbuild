@@ -124,11 +124,217 @@ if True:
         if copt.configfile:
             _logger.warning("Configuration could not be read from %s", copt.configfile)
 
+RPM_SECTIONS = ['description', 'package', 'prep', 'build', 'install', 'clean', 'files', 'changelog']
+
 class SpecContents(object):
     """Contains an RPM spec file
     
         From this data structure, the same, exact, spec file should be reconstructed
     """
+    _section_re = re.compile('^%('+ '|'.join(RPM_SECTIONS) + r')\b')
+    _define_re = re.compile(r'^\s*%define\s+(\w+)\s+(.*)$')
+    _header_re = re.compile(r'^(\w+)\s*:\s+(.*)$')
+    _varre = re.compile(r'%\{(\w+)\}')
+
+    _vars_to_resolve = ['version', 'release', 'name']
+    _vars_to_skip = ['version', 'release', 'name']
+
+    _setup_re = re.compile(r'^\s*%setup\s+(.*)$')
+    _patch_re = re.compile(r'^\s*%patch\s+(.*)$')
+
+    def __init__(self):
+        self.sections = {}
+        self.section_heads = {'': None }
+        self.variables = {} # detected variable substitutions from %define
+        self.spec_vars = {}
+        self.section_order = ['',]
+        self._sources = {}
+        self._patches = {}
+        self._prep_steps = []
+    
+    def replace_vars(self, varstr):
+        """return the string with %define'd variables replaced inline
+        
+            Note: it does NOT strip the resulting string, will preserve whitespace
+        """
+        return self._varre.sub(self._resolve, varstr)
+        
+    def _resolve(self, varm):
+        r = self.variables.get(varm.group(1), None)
+        if r is None:
+            return varm.group(1)
+        elif r is True:
+            return '1'
+        elif r:
+            return r
+        else:
+            return varm.group(1)
+
+    def parse_in(self, fp, mstep):
+        seclist, line_fn = self._init_section_()
+        
+        for line in fp:
+            if not line:
+                continue
+
+            ms = self._section_re.match(line)
+            if ms:
+                cur_section = ms.group(1)
+                if cur_section in self.sections:
+                    _logger.warning("Section defined twice: %s", cur_section)
+                self.section_order.append(cur_section)
+                init_fn = getattr(self, '_init_section_%s' % cur_section)
+                rest = line[ms.end():].strip()
+                seclist, line_fn = init_fn(rest)
+                continue
+
+            line_fn(line, seclist)
+
+        #print "RPM spec:", self.sections
+        #print "Defines:", self.variables
+        #print "Headers:", self.spec_vars
+        #print "Sources:", self._sources
+        #print "Patches:", self._patches
+        #print "Prep steps:", self._prep_steps
+
+
+    def _init_section_(self, rest=''):
+        return self.sections.setdefault('', []), self._proc_line_default
+        
+        #elif cur_section == '' and ':' in line:
+        #        section.append(line)
+    
+    def _proc_line_default(self, line, section):
+        """Process lines of default (header) section
+        """
+        dmp = self._define_re.match(line)
+        hmp = None
+        if dmp:
+
+            var = dmp.group(1)
+            value = dmp.group(2)
+            if var in self.variables:
+                _logger.warning("Variable '%s' %%define'd twice!", var)
+            if var in self._vars_to_resolve:
+                value = self.replace_vars(value)
+
+            self.variables[var] = value
+
+            if var in self._vars_to_skip:
+                return
+        else:
+            hmp = self._header_re.match(line)
+            if hmp:
+                hvar = hmp.group(1)
+                hvalue = hmp.group(2)
+                if hvar == 'Version':
+                    self.spec_vars['version'] = self.replace_vars(hvalue).strip()
+                    section.append('Version:\t%git_get_ver\n')
+                    return
+                elif hvar == 'Release':
+                    self.spec_vars['release'] = self.replace_vars(hvalue).strip()
+                    section.append('Release:\t%mkrel %git_get_rel2\n')
+                    return
+                elif hvar.startswith('Source'):
+                    # gitify
+                    src_num = hvar[6:]
+                    if not self._sources:
+                        section.append('Source:\t%git_bs_source %{name}-%{version}.tar.gz\n')
+                        section.append('Source1:\t%{name}-gitrpm.version\n')
+                        section.append('Source2:\t%{name}-changelog.gitrpm.txt\n')
+                    self._sources[src_num] = self.replace_vars(hvalue).strip()
+                    return
+                elif hvar.startswith('Patch'):
+                    patch_num = hvar[6:]
+                    self._patches[patch_num] = self.replace_vars(hvalue).strip()
+                    return
+
+        section.append(line)
+
+    def _proc_line_plain(self, line, section):
+        """Just append lines to the section buffer
+        """
+        section.append(line)
+
+    def _init_section_description(self, rest):
+        assert not rest, "description: %s" % rest
+        #if rest:
+        #    self.section_heads[cur_section] = rest
+        
+        return self.sections.setdefault('description', []), self._proc_line_plain
+    
+    def _proc_line_prep(self, line, seclines):
+        """Process lines for the 'prep' section
+        
+            Much to do here. We clean the '%setup' directives and parse the Sources
+            needed. Then, prepare the list of patches to apply
+        """
+        
+        smp = self._setup_re.match(line)
+        if smp:
+            args = self.replace_vars(smp.group(1)).strip().split()
+            name = None
+            source = self._sources.get('', None)
+            if source is None:
+                source = self.spec_vars.get('0', None)
+            while args:
+                r0 = args.pop(0)
+                if not r0:
+                    continue
+                elif r0 == '-q':
+                    pass
+                elif r0 == '-n':
+                    name = args.pop(0)
+                else:
+                    _logger.warning("Unknown switch to %%setup: '%s'", r0)
+            _logger.debug("Will extract source from %s, name=%s", source, name)
+            self._prep_steps.append((Untar, dict(source=source, pname=name)))
+            if len(self._prep_steps) == 1:
+                self._prep_steps.append((Git_Commit_Source, dict(msg="Initial source from Mageia %s" % source)))
+                self._prep_steps.append((Git_tag, dict(tag='v'+self.spec_vars.get('version', '0.0'))))
+                self._prep_steps.append((Placeholder, {}))
+            else:
+                self._prep_steps.append((Git_Commit_Source, dict(msg="Add source from %s" % source)))
+            return
+        pmp = self._patch_re.match(line)
+        if pmp:
+            raise NotImplementedError # TODO
+            return
+   
+        if line.strip().startswith('%'):
+            _logger.warning("Unknown line in setup: %s", line.strip())
+        seclines.append(line)
+
+    def _init_section_prep(self, rest):
+        assert not rest, "prep: %s" % rest
+        
+        return self.sections.setdefault('prep', []), self._proc_line_prep
+
+    def _init_section_build(self, rest):
+        assert not rest, "build: %s" % rest
+        
+        return self.sections.setdefault('build', []), self._proc_line_plain
+
+    def _init_section_install(self, rest):
+        assert not rest, "install: %s" % rest
+        
+        return self.sections.setdefault('install', []), self._proc_line_plain
+
+    def _init_section_files(self, rest):
+        assert not rest, "files: %s" % rest
+        
+        return self.sections.setdefault('files', []), self._proc_line_plain
+
+    def _init_section_changelog(self, rest):
+        assert not rest, "changelog: %s" % rest
+        
+        return self.sections.setdefault('changelog', []), self._proc_line_plain
+
+    def _init_section_clean(self, rest):
+        assert not rest, "clean: %s" % rest
+        
+        return self.sections.setdefault('clean', []), self._proc_line_plain
+
 class MWorker(object):
     _name = '<base>'
     def __init__(self, parent):
@@ -172,12 +378,37 @@ class Parse_Spec(MWorker):
         spec = self._parent._spec = SpecContents()
         spec.parse_in(fp, self)
         
+        # Now, replace the two placeholders in migrator's chain with the prep steps
+        for t in 1,2 :
+            for i, step in enumerate(self._parent._steps):
+                if isinstance(step, Placeholder):
+                    self._parent._steps.pop(i)
+                    while spec._prep_steps:
+                        nclass, kwargs = spec._prep_steps.pop(0)
+                        if nclass == Placeholder:
+                            break
+                        self._parent._steps.insert(i, nclass(self._parent, **kwargs))
+                        i += 1
+                    break
+        _logger.debug("Done parsing the SPEC")
 
 class Untar(MWorker):
     _name = "extract the initial source"
+    
+    def __init__(self, parent, source, pname):
+        """Untar `source` at path name `pname`
+        """
+        super(Untar, self).__init__(parent)
+        self.source = source
+        self.pname = pname
 
 class Git_Commit_Source(MWorker):
     _name = "commit the upstream source in git"
+    
+    def __init__(self, parent, msg):
+        """ Commit everything, with message `msg`
+        """
+
 class Git_Mga_branch(MWorker):
     _name = "create a 'mageia' branch"
     
