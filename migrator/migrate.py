@@ -196,6 +196,12 @@ class Migrator(object):
     def finished(self):
         return not self._steps
 
+    def pre_check(self):
+        if self._svndir and not os.path.isdir(self._svndir):
+                raise EnvironmentError("SVN temporary dir not found: %s" % self._svndir)
+        if self._gitdir and not os.path.isdir(self._gitdir):
+                raise EnvironmentError("GIT temporary dir not found: %s" % self._gitdir)
+
     def work(self):
         step = self._steps[0]
         _logger.debug('Trying to %s at migrator of %s', step, self._project)
@@ -232,6 +238,12 @@ if not migs:
 
 for mig in migs:
     _logger.debug("Using migrator of %s", mig._project)
+    try:
+        mig.pre_check()
+    except EnvironmentError, e:
+        _logger.error("Cannot continue migration: %s : %s", mig._project, e)
+        continue
+
     while not mig.finished():
         try:
             mig.work()
