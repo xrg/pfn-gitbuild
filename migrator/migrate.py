@@ -12,6 +12,15 @@ import tempfile
 
 from optparse import OptionParser
 
+""" Mageia(+Mandriva) SVN->Git project migrator
+
+    We take projects from SVN, read the spec and convert them to self-building git repositories.
+    
+    The migrator is, of course, incremental. It saves its state in a Pickle file and then resumes
+    from that. This way, we can amend the code in this script, run again and hopefully manage
+    to do the migration right.
+"""
+
 parser = OptionParser()
 
 # spec sub-path "contrib/mageia/xx.spec", "contrib/mandriva/xx.spec", "contrib/mageia.spec", "contrib/mandriva.spec",
