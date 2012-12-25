@@ -9,6 +9,7 @@ import re
 import cPickle as pickle
 import errno
 import tempfile
+import shutil
 
 from optparse import OptionParser
 
@@ -197,6 +198,19 @@ class SpecContents(object):
         #print "Patches:", self._patches
         #print "Prep steps:", self._prep_steps
 
+    def gitify_out(self, fp):
+
+        for section in self.section_order:
+            print "section:", section
+            if section:
+                ss = '%' + section
+                if section in self.section_heads:
+                    ss += ' ' + self.section_heads[section]
+                ss += '\n'
+                fp.write(ss)
+
+            for line in self.sections[section]:
+                fp.write(line)
 
     def _init_section_(self, rest=''):
         return self.sections.setdefault('', []), self._proc_line_default
@@ -227,7 +241,10 @@ class SpecContents(object):
             if hmp:
                 hvar = hmp.group(1)
                 hvalue = hmp.group(2)
-                if hvar == 'Version':
+                if hvar == 'Name':
+                    section.append('Name:\t\t%s\n' % self.replace_vars(hvalue))
+                    return
+                elif hvar == 'Version':
                     self.spec_vars['version'] = self.replace_vars(hvalue).strip()
                     section.append('Version:\t%git_get_ver\n')
                     return
@@ -239,7 +256,7 @@ class SpecContents(object):
                     # gitify
                     src_num = hvar[6:]
                     if not self._sources:
-                        section.append('Source:\t%git_bs_source %{name}-%{version}.tar.gz\n')
+                        section.append('Source:\t\t%git_bs_source %{name}-%{version}.tar.gz\n')
                         section.append('Source1:\t%{name}-gitrpm.version\n')
                         section.append('Source2:\t%{name}-changelog.gitrpm.txt\n')
                     self._sources[src_num] = self.replace_vars(hvalue).strip()
@@ -293,6 +310,8 @@ class SpecContents(object):
                 self._prep_steps.append((Git_Commit_Source, dict(msg="Initial source from Mageia %s" % source)))
                 self._prep_steps.append((Git_tag, dict(tag='v'+self.spec_vars.get('version', '0.0'))))
                 self._prep_steps.append((Placeholder, {}))
+                seclines.append('%git_get_source\n')
+                seclines.append('%setup -q\n')
             else:
                 self._prep_steps.append((Git_Commit_Source, dict(msg="Add source from %s" % source)))
             return
@@ -358,14 +377,18 @@ class Set_Paths(MWorker):
 
 class Checkout(MWorker):
     _name = "checkout from SVN"
-    
+
     def work(self):
         subprocess.check_call(['mgarepo', 'co', self._parent._project], cwd=self._parent._svndir)
         _logger.debug('Checked out %s to %s .', self._parent._project, self._parent._svndir)
+        self._parent._svndir = os.path.join(self._parent._svndir, self._parent._project)
 
 class Git_Init(MWorker):
     _name = "initialize git dir"
-    
+    def work(self):
+        subprocess.check_call(['git', 'init', self._parent._project], cwd=self._parent._gitdir)
+        self._parent._gitdir = os.path.join(self._parent._gitdir, self._parent._project)
+
 class Parse_Spec(MWorker):
     """
         After parsing the SPEC file, this worker will *add* the next steps, according
@@ -374,7 +397,7 @@ class Parse_Spec(MWorker):
     _name = "parse the spec file"
     
     def work(self):
-        fp = open(os.path.join(self._parent._svndir, self._parent._project, 'SPECS', self._parent._project + '.spec'), 'rb')
+        fp = open(os.path.join(self._parent._svndir, 'SPECS', self._parent._project + '.spec'), 'rb')
         spec = self._parent._spec = SpecContents()
         spec.parse_in(fp, self)
         
@@ -402,37 +425,90 @@ class Untar(MWorker):
         self.source = source
         self.pname = pname
 
+    def work(self):
+        subprocess.check_call(['tar', 'xf', os.path.join(self._parent._svndir, 'SOURCES', self.source),
+                    '--strip-components=1'], cwd=self._parent._gitdir)
+        _logger.debug('Extracted source from tar %s', self.source)
+
 class Git_Commit_Source(MWorker):
     _name = "commit the upstream source in git"
     
     def __init__(self, parent, msg):
         """ Commit everything, with message `msg`
         """
+        super(Git_Commit_Source, self).__init__(parent)
+        self._msg = msg
+
+    def work(self):
+        subprocess.check_call(['git', 'add', '--all'], cwd=self._parent._gitdir)
+        subprocess.check_call(['git', 'commit', '--no-verify', '-m', self._msg], cwd=self._parent._gitdir)
 
 class Git_Mga_branch(MWorker):
     _name = "create a 'mageia' branch"
     
+    def __init__(self, parent, branch='mageia'):
+        super(Git_Mga_branch, self).__init__(parent)
+        self._branch = branch
+
+    def work(self):
+        subprocess.check_call(['git', 'checkout', '-b', self._branch], cwd=self._parent._gitdir)
+
 class Chose_Spec_Path(MWorker):
     _name = "find the right place for the spec file"
+    
+    def work(self):
+        self._parent._spec_path = os.path.join('contrib', 'mageia', self._parent._project+'.spec')
 
 class Copy_Spec(MWorker):
     _name = "copy the spec into the git repo"
 
+    def work(self):
+        spec_dir = os.path.join(self._parent._gitdir, os.path.dirname(self._parent._spec_path))
+        if not os.path.isdir(spec_dir):
+            os.makedirs(spec_dir)
+        shutil.copy(os.path.join(self._parent._svndir, 'SPECS', self._parent._project + '.spec'),
+                os.path.join(self._parent._gitdir, self._parent._spec_path))
+
 class Git_Commit_Spec(MWorker):
     _name = "commit the spec file in git"
+
+    def work(self):
+        subprocess.check_call(['git', 'add', self._parent._spec_path], cwd=self._parent._gitdir)
+        subprocess.check_call(['git', 'commit', '-m', 'mga: SPEC file, from Mageia',],
+                cwd=self._parent._gitdir)
 
 class Placeholder(MWorker):
     _name = "no op placeholder"
 
+    def work(self):
+        raise RuntimeError("A placeholder cannot ever work. You forgot to replace it.")
+
 class Gitify_Spec(MWorker):
     _name = "gitify the spec file"
+    
+    def work(self):
+        fp = open(os.path.join(self._parent._gitdir, self._parent._spec_path), 'wb')
+        fp.write('%%define git_repo %s\n%%define git_head HEAD\n\n' % self._parent._project)
+        self._parent._spec.gitify_out(fp)
+        fp.close()
 
 class Git_Commit_Spec2(MWorker):
     _name = "commit the gitified spec"
 
+    def work(self):
+        subprocess.check_call(['git', 'add', self._parent._spec_path], cwd=self._parent._gitdir)
+        subprocess.check_call(['git', 'commit', '-m', 'mga: gitify the spec file',],
+                cwd=self._parent._gitdir)
 
 class Git_tag(MWorker):
     _name = "add the versioned tag to git"
+    
+    def __init__(self, parent, tag):
+        super(Git_tag, self).__init__(parent)
+        self._tag = tag
+
+    def work(self):
+        subprocess.check_call(['git', 'tag', self._tag], cwd=self._parent._gitdir)
 
 class Migrator(object):
     
@@ -443,6 +519,7 @@ class Migrator(object):
         self._gitdir = None
         self._context = {}
         self._spec = None
+        self._spec_path = None
         for sclass in (Set_Paths, Checkout, Git_Init, Parse_Spec, Placeholder, \
                     Git_Mga_branch, Chose_Spec_Path, Copy_Spec, Git_Commit_Spec, \
                     Placeholder, Gitify_Spec, Git_Commit_Spec2):
