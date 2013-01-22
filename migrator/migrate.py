@@ -76,6 +76,11 @@ if True:
     pgroup1.add_option("--quiet", dest="quiet", action='store_true', default=False,
                         help="Print only error messages")
     pgroup1.add_option("--log", dest="logfile", help="A file to write plain log to, or 'stderr'")
+    
+    pgroup3 = optparse.OptionGroup(parser, 'SVN repository options')
+    pgroup3.add_option("--mga-repo-url", help="Mageia SVN repository URL")
+    pgroup3.add_option("--mga-mirror-url", help="Mageia read-only SVN repository URL for checking-out packages")
+    pgroup3.add_option("--mga-trunk-dir", help="Mageia SVN trunk-directory, aka. distro version")
 
     pgroup2 = optparse.OptionGroup(parser, 'Config-File options',
                     " These options help run this script with pre-configured settings.")
@@ -379,9 +384,23 @@ class Set_Paths(MWorker):
 
 class Checkout(MWorker):
     _name = "checkout from SVN"
+    def __init__(self, parent):
+        super(Checkout, self).__init__(parent)
+        global opts
+        self._mga_repo = opts.mga_repo_url
+        self._mga_mirror = opts.mga_mirror_url
+        self._mga_trunk = opts.mga_trunk_dir
 
     def work(self):
-        subprocess.check_call(['mgarepo', 'co', self._parent._project], cwd=self._parent._svndir)
+        global opts
+        name = self._parent._project
+        if self._mga_trunk:
+            name = '%s/%s' % ( self._mga_trunk, name)
+        if self._mga_mirror:
+            name = self._mga_mirror + '/' + name
+        elif self._mga_repo:
+            name = self._mga_repo + '/' + name
+        subprocess.check_call( ['mgarepo', 'co', name ], cwd=self._parent._svndir)
         _logger.debug('Checked out %s to %s .', self._parent._project, self._parent._svndir)
         self._parent._svndir = os.path.join(self._parent._svndir, self._parent._project)
 
