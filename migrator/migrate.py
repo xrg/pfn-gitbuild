@@ -141,6 +141,7 @@ class SpecContents(object):
     _define_re = re.compile(r'^\s*%define\s+(\w+)\s+(.*)$')
     _header_re = re.compile(r'^(\w+)\s*:\s+(.*)$')
     _varre = re.compile(r'%\{(\w+)\}')
+    _varre2 = re.compile(r'%(\w+)')
 
     _vars_to_resolve = ['version', 'release', 'name']
     _vars_to_skip = ['version', 'release', 'name']
@@ -163,7 +164,8 @@ class SpecContents(object):
         
             Note: it does NOT strip the resulting string, will preserve whitespace
         """
-        return self._varre.sub(self._resolve, varstr)
+        res1 = self._varre.sub(self._resolve, varstr)
+        return self._varre2.sub(self._resolve, res1)
         
     def _resolve(self, varm):
         r = self.variables.get(varm.group(1), None)
