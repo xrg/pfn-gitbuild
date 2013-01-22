@@ -179,7 +179,7 @@ class SpecContents(object):
             return varm.group(1)
 
     def parse_in(self, fp, mstep):
-        seclist, line_fn = self._init_section_()
+        seclist, line_fn = self._init_section_('')
         
         for line in fp:
             if not line:
@@ -188,12 +188,16 @@ class SpecContents(object):
             ms = self._section_re.match(line)
             if ms:
                 cur_section = ms.group(1)
+                rest = line[ms.end():].strip()
+                init_fn = getattr(self, '_init_section_%s' % cur_section)
+                if cur_section in ('description', 'package', 'files', 'pre_un' ) and rest: # TODO
+                    cur_section = (cur_section, rest)
+                    rest = None
+                _logger.debug("Parsing section: %s", cur_section)
                 if cur_section in self.sections:
                     _logger.warning("Section defined twice: %s", cur_section)
                 self.section_order.append(cur_section)
-                init_fn = getattr(self, '_init_section_%s' % cur_section)
-                rest = line[ms.end():].strip()
-                seclist, line_fn = init_fn(rest)
+                seclist, line_fn = init_fn(cur_section, rest)
                 continue
 
             line_fn(line, seclist)
@@ -208,19 +212,24 @@ class SpecContents(object):
     def gitify_out(self, fp):
 
         for section in self.section_order:
-            print "section:", section
+            section_lines = self.sections[section]
             if section:
+                package = None
+                if isinstance(section, tuple):
+                    section, package = section
                 ss = '%' + section
                 if section in self.section_heads:
                     ss += ' ' + self.section_heads[section]
+                if package:
+                    ss += ' ' + package
                 ss += '\n'
                 fp.write(ss)
 
-            for line in self.sections[section]:
+            for line in section_lines:
                 fp.write(line)
 
-    def _init_section_(self, rest=''):
-        return self.sections.setdefault('', []), self._proc_line_default
+    def _init_section_(self, section_id, rest=''):
+        return self.sections.setdefault(section_id, []), self._proc_line_default
         
         #elif cur_section == '' and ':' in line:
         #        section.append(line)
@@ -255,10 +264,12 @@ class SpecContents(object):
                     self.spec_vars['version'] = self.replace_vars(hvalue).strip()
                     self.variables['version'] = self.spec_vars['version'] # because rpm does that, too
                     section.append('Version:\t%git_get_ver\n')
+                    _logger.debug("Found upstream version: %s", self.spec_vars['version'])
                     return
                 elif hvar == 'Release':
                     self.spec_vars['release'] = self.replace_vars(hvalue).strip()
                     section.append('Release:\t%mkrel %git_get_rel2\n')
+                    _logger.debug("Found upstream release: %s", self.spec_vars["release"])
                     return
                 elif hvar.startswith('Source'):
                     # gitify
@@ -281,12 +292,16 @@ class SpecContents(object):
         """
         section.append(line)
 
-    def _init_section_description(self, rest):
+    def _init_section_package(self, section_id, rest):
+        # note TODO we only do plain line processing, not variable substitution!
+        return self.sections.setdefault(section_id, []), self._proc_line_plain
+        
+    def _init_section_description(self, section_id, rest):
         assert not rest, "description: %s" % rest
         #if rest:
         #    self.section_heads[cur_section] = rest
         
-        return self.sections.setdefault('description', []), self._proc_line_plain
+        return self.sections.setdefault(section_id, []), self._proc_line_plain
     
     def _proc_line_prep(self, line, seclines):
         """Process lines for the 'prep' section
@@ -330,38 +345,42 @@ class SpecContents(object):
             return
    
         if line.strip().startswith('%'):
-            _logger.warning("Unknown line in setup: %s", line.strip())
+            if line.startswith(('%if', '%else', '%endif')):
+                # TODO: nested %if processing
+                pass
+            else:
+                _logger.warning("Unknown line in setup: %s", line.strip())
         seclines.append(line)
 
-    def _init_section_prep(self, rest):
+    def _init_section_prep(self, section_id, rest):
         assert not rest, "prep: %s" % rest
         
-        return self.sections.setdefault('prep', []), self._proc_line_prep
+        return self.sections.setdefault(section_id, []), self._proc_line_prep
 
-    def _init_section_build(self, rest):
+    def _init_section_build(self, section_id, rest):
         assert not rest, "build: %s" % rest
         
-        return self.sections.setdefault('build', []), self._proc_line_plain
+        return self.sections.setdefault(section_id, []), self._proc_line_plain
 
-    def _init_section_install(self, rest):
+    def _init_section_install(self, section_id, rest):
         assert not rest, "install: %s" % rest
         
-        return self.sections.setdefault('install', []), self._proc_line_plain
+        return self.sections.setdefault(section_id, []), self._proc_line_plain
 
-    def _init_section_files(self, rest):
+    def _init_section_files(self, section_id, rest):
         assert not rest, "files: %s" % rest
         
-        return self.sections.setdefault('files', []), self._proc_line_plain
+        return self.sections.setdefault(section_id, []), self._proc_line_plain
 
-    def _init_section_changelog(self, rest):
+    def _init_section_changelog(self, section_id, rest):
         assert not rest, "changelog: %s" % rest
         
-        return self.sections.setdefault('changelog', []), self._proc_line_plain
+        return self.sections.setdefault(section_id, []), self._proc_line_plain
 
-    def _init_section_clean(self, rest):
+    def _init_section_clean(self, section_id, rest):
         assert not rest, "clean: %s" % rest
         
-        return self.sections.setdefault('clean', []), self._proc_line_plain
+        return self.sections.setdefault(section_id, []), self._proc_line_plain
 
 class MWorker(object):
     _name = '<base>'
@@ -535,7 +554,7 @@ class Git_tag(MWorker):
 
 class Migrator(object):
     
-    def __init__(self, project, ):
+    def __init__(self, project):
         self._project = project
         self._steps = []
         self._svndir = None
