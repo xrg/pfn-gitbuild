@@ -140,8 +140,7 @@ class SpecContents(object):
     _section_re = re.compile('^%('+ '|'.join(RPM_SECTIONS) + r')\b')
     _define_re = re.compile(r'^\s*%define\s+(\w+)\s+(.*)$')
     _header_re = re.compile(r'^(\w+)\s*:\s+(.*)$')
-    _varre = re.compile(r'%\{(\w+)\}')
-    _varre2 = re.compile(r'%(\w+)')
+    _varre = re.compile(r'%(?:\{(\w+)\})|(\w+)')
 
     _vars_to_resolve = ['version', 'release', 'name']
     _vars_to_skip = ['version', 'release', 'name']
@@ -158,25 +157,30 @@ class SpecContents(object):
         self._sources = {}
         self._patches = {}
         self._prep_steps = []
-    
+
     def replace_vars(self, varstr):
         """return the string with %define'd variables replaced inline
-        
+
             Note: it does NOT strip the resulting string, will preserve whitespace
         """
-        res1 = self._varre.sub(self._resolve, varstr)
-        return self._varre2.sub(self._resolve, res1)
-        
+        while True:
+            oldstr = varstr
+            varstr = self._varre.sub(self._resolve, varstr)
+            if oldstr == varstr:
+                break
+        return varstr
+
     def _resolve(self, varm):
-        r = self.variables.get(varm.group(1), None)
+        orig = varm.group(1) or varm.group(2)
+        r = self.variables.get(orig, None)
         if r is None:
-            return varm.group(1)
+            return orig
         elif r is True:
             return '1'
         elif r:
             return r
         else:
-            return varm.group(1)
+            return orig
 
     def parse_in(self, fp, mstep):
         seclist, line_fn = self._init_section_('')
