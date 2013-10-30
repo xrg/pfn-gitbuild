@@ -262,7 +262,10 @@ class SpecContents(object):
                 hvar = hmp.group(1)
                 hvalue = hmp.group(2)
                 if hvar == 'Name':
-                    section.append('Name:\t\t%s\n' % self.replace_vars(hvalue))
+                    new_val = self.replace_vars(hvalue)
+                    section.append('Name:\t\t%s\n' % new_val)
+                    if 'name' not in self.variables:
+                        self.variables['name'] = new_val
                     return
                 elif hvar == 'Version':
                     self.spec_vars['version'] = self.replace_vars(hvalue).strip()
