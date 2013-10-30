@@ -313,6 +313,7 @@ class SpecContents(object):
         smp = self._setup_re.match(line)
         if smp:
             args = self.replace_vars(smp.group(1)).strip().split()
+            # print "args:", args
             name = None
             source = self._sources.get('', None)
             if source is None:
