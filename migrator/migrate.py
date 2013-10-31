@@ -76,6 +76,10 @@ if True:
     pgroup1.add_option("--quiet", dest="quiet", action='store_true', default=False,
                         help="Print only error messages")
     pgroup1.add_option("--log", dest="logfile", help="A file to write plain log to, or 'stderr'")
+    pgroup1.add_option("--skip", "--skip-steps", dest="skip_steps", type=int,
+                        help="Number of steps to skip")
+    pgroup1.add_option("--one-step", action='store_true', default=False,
+                        help="Perform one step and then stop")
     
     pgroup3 = optparse.OptionGroup(parser, 'SVN repository options')
     pgroup3.add_option("--mga-repo-url", help="Mageia SVN repository URL")
@@ -594,6 +598,9 @@ class Migrator(object):
         _logger.debug('Trying to %s at migrator of %s', step, self._project)
         step.work()
         self._steps.pop(0)
+    
+    def skip(self):
+        self._steps.pop(0)
 
 migs = []
 
@@ -635,6 +642,10 @@ if not migs:
     _logger.warning("Must have at least one project to work at. List is empty now!")
     sys.exit(0)
 
+steps_skip = 0
+if copt.skip_steps:
+    steps_skip = int(copt.skip_steps)
+
 for mig in migs:
     _logger.debug("Using migrator of %s", mig._project)
     try:
@@ -644,6 +655,9 @@ for mig in migs:
         continue
 
     while not mig.finished():
+        if steps_skip:
+            mig.skip()
+            steps_skip -= 1
         try:
             mig.work()
         except subprocess.CalledProcessError, e:
@@ -651,6 +665,8 @@ for mig in migs:
             break
         except Exception:
             _logger.exception("Failed migration of %r", mig)
+            break
+        if copt.one_step:
             break
 
 try:
