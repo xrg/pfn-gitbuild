@@ -150,17 +150,19 @@ class SpecContents(object):
     _vars_to_skip = ['version', 'release', 'name']
 
     _setup_re = re.compile(r'^\s*%setup\s+(.*)$')
-    _patch_re = re.compile(r'^\s*%patch\s+(.*)$')
+    _patch_re = re.compile(r'^\s*%patch([0-9]+)\s+(.*)$')
 
     def __init__(self):
         self.sections = {}
         self.section_heads = {'': None }
-        self.variables = {} # detected variable substitutions from %define
+        self.variables = {'nil': ''} # detected variable substitutions from %define
         self.spec_vars = {}
         self.section_order = ['',]
         self._sources = {}
         self._patches = {}
         self._prep_steps = []
+        self._prev_comments = []
+        self._patch_comments = {}
 
     def replace_vars(self, varstr):
         """return the string with %define'd variables replaced inline
@@ -260,11 +262,15 @@ class SpecContents(object):
 
             if var in self._vars_to_skip:
                 return
+        elif line[0] == '#':
+            self._prev_comments.append(line[1:].lstrip())
         else:
             hmp = self._header_re.match(line)
             if hmp:
                 hvar = hmp.group(1)
                 hvalue = hmp.group(2)
+                hdr_comments = self._prev_comments
+                self._prev_comments = []
                 if hvar == 'Name':
                     new_val = self.replace_vars(hvalue)
                     section.append('Name:\t\t%s\n' % new_val)
@@ -292,8 +298,10 @@ class SpecContents(object):
                     self._sources[src_num] = self.replace_vars(hvalue).strip().rsplit('/', 1)[-1]
                     return
                 elif hvar.startswith('Patch'):
-                    patch_num = hvar[6:]
+                    patch_num = hvar[5:].strip()
                     self._patches[patch_num] = self.replace_vars(hvalue).strip()
+                    if hdr_comments:
+                        self._patch_comments[patch_num] = hdr_comments
                     return
 
         section.append(line)
@@ -353,7 +361,26 @@ class SpecContents(object):
             return
         pmp = self._patch_re.match(line)
         if pmp:
-            raise NotImplementedError # TODO
+            args = self.replace_vars(pmp.group(2)).strip().split()
+            patch_level = 0
+            while args:
+                r0 = args.pop(0)
+                if not r0:
+                    continue
+                elif r0 == '-q':
+                    pass
+                elif r0[:2] == '-p':
+                    if len(r0) > 2:
+                        patch_level = int(r0[2:])
+                    else:
+                        patch_level = int(args.pop(0))
+                elif r0 == '-b':
+                    args.pop(0)
+                else:
+                    _logger.warning("Unknown switch to %%patch: '%s'", r0)
+            self._prep_steps.append((Patch, dict(source=self._patches[pmp.group(1)], patch_level=patch_level)))
+            self._prep_steps.append((Git_Commit_Source, dict(msg=self._patch_comments.get(pmp.group(1), \
+                        "apply patch: %s" % self._patches[pmp.group(1)]) )))
             return
    
         if line.strip().startswith('%'):
@@ -494,6 +521,8 @@ class Git_Commit_Source(MWorker):
         self._msg = msg
 
     def work(self):
+        if isinstance(self._msg, list):
+            self._msg = '\n'.join(self._msg)
         subprocess.check_call(['git', 'add', '--all'], cwd=self._parent._gitdir)
         subprocess.check_call(['git', 'commit', '--no-verify', '-m', self._msg], cwd=self._parent._gitdir)
 
@@ -563,6 +592,22 @@ class Git_tag(MWorker):
 
     def work(self):
         subprocess.check_call(['git', 'tag', self._tag], cwd=self._parent._gitdir)
+
+class Patch(MWorker):
+    _name = "patch"
+    
+    def __init__(self, parent, source, patch_level=0):
+        """Untar `source` at path name `pname`
+        """
+        super(Patch, self).__init__(parent)
+        self.source = source
+        self.patch_level = patch_level
+
+    def work(self):
+        _logger.info("Applying patch: %s", self.source)
+        subprocess.check_call(['patch', '-p%d' % self.patch_level, '--no-backup-if-mismatch', '-i',
+                    os.path.join(self._parent._svndir, 'SOURCES', self.source)],
+                cwd=self._parent._gitdir)
 
 class Migrator(object):
     
