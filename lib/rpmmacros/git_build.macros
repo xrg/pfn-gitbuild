@@ -4,12 +4,13 @@
 #override this, please!
 %git_repodir %(echo ~/build/)
 %git_head HEAD
+%git_source_subpath .
 
 %git_gitdir %{git_repodir}/%{git_repo}/.git
 
 %git_get_source if [ -d %{git_gitdir} ] ; then \
 	pushd %{git_gitdir}/.. ;\
-	/usr/bin/git archive --format=tar --prefix=%{name}-%{version}/ %{git_head} | \
+	/usr/bin/git archive --format=tar --prefix=%{name}-%{version}/ %{git_head} %{git_source_subpath} | \
 		gzip -c > %{_sourcedir}/%{name}-%{version}.tar.gz ;\
 	popd ; \
 	gitrpm-changelog -d %{git_gitdir} -n %{name} -r %{git_head} -C %{_sourcedir} ;\
