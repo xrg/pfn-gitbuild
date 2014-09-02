@@ -15,7 +15,7 @@ OUTDIR="."
 BOOTSTRAP=
 GET_ONLY=n
 DO_ZEROEXTRA=
-UGLY_REGEXP='^v\?\([0-9\.]*\)-\?\([a-z]\+[0-9]*\)\?-\([0-9]\+\)-g.*$'
+UGLY_REGEXP='^v\?\([0-9\.]*\)-\?\([a-z]\+[0-9]*\)\?-\([0-9]\+\)\(-g.*\)\?$'
 
 while [ -n "$1" ] ; do
 case "$1" in
@@ -44,12 +44,26 @@ case "$1" in
 		GET_ONLY=y
 		shift 2
 		;;
+    -S)
+        # OpenSSL versioning: "v1.2.3f" ...
+        UGLY_REGEXP='^v\?\([0-9\.]*\)-\?\([a-z]\+[0-9]*\)\?-\([0-9]\+\w\)\(-g.*\)\?$'
+        shift 1;
+        ;;
 	-0)
 		DO_ZEROEXTRA=y
 		shift 1
 		;;
 esac
 done
+
+# Some quirks for projects not following clean "v1.2.3" versioning
+
+case "$REPONAME" in 
+    openssl)
+        UGLY_REGEXP='^v\?\([0-9\.]*\w\?\)-\?\([a-z]\+[0-9]*\)\?-\([0-9]\+\)\(-g.*\)\?$'
+        ;;
+esac
+
 	
 if [ "$GET_ONLY" != "y" ] && [ -d "$GITDIR" ] ; then
 	if ! VERSION_STRING=$(git --git-dir="$GITDIR" describe --tags --match 'v[0-9]*.[0-9]*' "$GIT_HEAD") ; then
@@ -67,6 +81,7 @@ if [ "$GET_ONLY" != "y" ] && [ -d "$GITDIR" ] ; then
 		sed "s/$UGLY_REGEXP/\3/")
 
 	VERSION_EXTRA=$(echo $VERSION_STRING | \
+        grep '\-g.\+$' | \
 		sed "s/$UGLY_REGEXP/\2/" )
 		
 cat '-' <<EOF > "$OUTDIR"/$REPONAME-gitrpm.version
