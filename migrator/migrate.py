@@ -878,6 +878,9 @@ for mig in migs:
         if copt.one_step:
             break
 
+    if mig.finished():
+        _logger.info("Migrator finished, your package is at: %s", mig._gitdir)
+
 try:
     nmigs = filter(lambda m: not m.finished(), migs)
     ppfile = "~/.mga_migrator.dat"
