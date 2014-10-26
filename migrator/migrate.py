@@ -149,7 +149,7 @@ class SpecContents(object):
     _section_re = re.compile('^%('+ '|'.join(RPM_SECTIONS) + r')\b')
     _define_re = re.compile(r'^\s*%define\s+(\w+)\s+(.*)$')
     _header_re = re.compile(r'^(\w+)\s*:\s+(.*)$')
-    _varre = re.compile(r'%(?:\{(\w+)\})|(\w+)')
+    _varre = re.compile(r'%(?:(?:\{(\w+)\})|(\w+))')
 
     _vars_to_resolve = ['version', 'release', 'name']
     _vars_to_skip = ['version', 'release', 'name']
