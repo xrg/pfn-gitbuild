@@ -267,6 +267,9 @@ class SpecContents(object):
 
             if var in self._vars_to_skip:
                 return
+        elif line.startswith('#Patch') or line.startswith('# Patch'):
+            # Must be some commented-out patch, reset comments
+            self._prev_comments = []
         elif line[0] == '#':
             self._prev_comments.append(line[1:].lstrip())
         else:
