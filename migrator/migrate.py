@@ -80,11 +80,14 @@ if True:
                         help="Number of steps to skip")
     pgroup1.add_option("--one-step", action='store_true', default=False,
                         help="Perform one step and then stop")
-    
+    parser.add_option_group(pgroup1)
+
     pgroup3 = optparse.OptionGroup(parser, 'SVN repository options')
     pgroup3.add_option("--mga-repo-url", help="Mageia SVN repository URL")
     pgroup3.add_option("--mga-mirror-url", help="Mageia read-only SVN repository URL for checking-out packages")
     pgroup3.add_option("--mga-trunk-dir", help="Mageia SVN trunk-directory, aka. distro version")
+
+    parser.add_option_group(pgroup3)
 
     pgroup2 = optparse.OptionGroup(parser, 'Config-File options',
                     " These options help run this script with pre-configured settings.")
@@ -93,6 +96,8 @@ if True:
                 help="Read configuration options for this script from file. ")
     pgroup2.add_option("--no-config", dest="have_config", action="store_false", default=True,
                 help="Do not read the default config file, start with empty options.")
+
+    parser.add_option_group(pgroup2)
 
 (copt, args) = parser.parse_args()
 
