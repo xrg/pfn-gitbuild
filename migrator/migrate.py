@@ -537,7 +537,7 @@ class Set_Paths(MWorker):
         self._parent._svndir = tempfile.mkdtemp( prefix="mga_migr_%s_" % self._parent._project, dir=hometmp)
         self._parent._gitdir = tempfile.mkdtemp( prefix="mga_migr_%s_" % self._parent._project, dir=hometmp)
         _logger.debug("Temporary path for SVN will be: %s", self._parent._svndir)
-        _logger.debug("Temporary path for SVN will be: %s", self._parent._gitdir)
+        _logger.debug("Temporary path for GIT will be: %s", self._parent._gitdir)
 
 class Checkout(MWorker):
     _name = "checkout from SVN"
