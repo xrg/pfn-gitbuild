@@ -303,8 +303,8 @@ class SpecContents(object):
                     self._sources[src_num] = self.replace_vars(hvalue).strip().rsplit('/', 1)[-1]
                     return
                 elif hvar.startswith('Patch'):
-                    patch_num = hvar[5:].strip()
-                    self._patches[patch_num] = self.replace_vars(hvalue).strip()
+                    patch_num = int(hvar[5:].strip())
+                    self._patches[patch_num] = os.path.basename(self.replace_vars(hvalue).strip())
                     if hdr_comments:
                         self._patch_comments[patch_num] = hdr_comments
                     return
@@ -383,9 +383,13 @@ class SpecContents(object):
                     args.pop(0)
                 else:
                     _logger.warning("Unknown switch to %%patch: '%s'", r0)
-            self._prep_steps.append((Patch, dict(source=self._patches[pmp.group(1)], patch_level=patch_level)))
-            self._prep_steps.append((Git_Commit_Source, dict(msg=self._patch_comments.get(pmp.group(1), \
-                        "apply patch: %s" % self._patches[pmp.group(1)]) )))
+            patch_num = int(pmp.group(1))
+            if patch_num not in self._patches:
+                _logger.error("Patch %s not found for line: %s", pmp.group(1), line.strip())
+                raise RuntimeError
+            self._prep_steps.append((Patch, dict(source=self._patches[patch_num], patch_level=patch_level)))
+            self._prep_steps.append((Git_Commit_Source, dict(msg=self._patch_comments.get(patch_num, \
+                        "apply patch: %s" % self._patches[patch_num]) )))
             return
    
         if line.strip().startswith('%'):
