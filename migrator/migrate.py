@@ -408,12 +408,7 @@ class SpecContents(object):
                 else:
                     _logger.warning("Unknown switch to %%patch: '%s'", r0)
             patch_num = int(pmp.group(1))
-            if patch_num not in self._patches:
-                _logger.error("Patch %s not found for line: %s", pmp.group(1), line.strip())
-                raise RuntimeError
-            self._prep_steps.append((Patch, dict(source=self._patches[patch_num], patch_level=patch_level)))
-            self._prep_steps.append((Git_Commit_Source, dict(msg=self._patch_comments.get(patch_num, \
-                        "apply patch: %s" % self._patches[patch_num]) )))
+            self._prep_patch(patch_num, patch_level)
             return
    
         if line.strip().startswith('%'):
@@ -423,6 +418,20 @@ class SpecContents(object):
             else:
                 _logger.warning("Unknown line in setup: %s", line.strip())
         seclines.append(line)
+
+    def _prep_patch(self, patch_num, patch_level=1):
+        """Push patch in our _prep_steps
+        
+            Will auto-detect git patches and 'am' them instead
+        """
+        if patch_num not in self._patches:
+            _logger.error("Patch %s not found for line: %s", pmp.group(1), line.strip())
+            raise RuntimeError
+        
+        # TODO detect git patches
+        self._prep_steps.append((Patch, dict(source=self._patches[patch_num], patch_level=patch_level)))
+        self._prep_steps.append((Git_Commit_Source, dict(msg=self._patch_comments.get(patch_num, \
+                    "apply patch: %s" % self._patches[patch_num]) )))
 
     def _init_section_prep(self, section_id, rest):
         assert not rest, "prep: %s" % rest
