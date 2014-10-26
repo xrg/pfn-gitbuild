@@ -656,7 +656,7 @@ class Patch(MWorker):
         if '/' in self.source:
             self.source = os.path.basename(self.source)
         _logger.info("Applying patch: %s", self.source)
-        subprocess.check_call(['patch', '-p%d' % self.patch_level, '--no-backup-if-mismatch', '-i',
+        subprocess.check_call(['patch', '-p%d' % self.patch_level, '-F0', '--no-backup-if-mismatch', '-i',
                     os.path.join(self._parent._svndir, 'SOURCES', self.source)],
                 cwd=self._parent._gitdir)
 
