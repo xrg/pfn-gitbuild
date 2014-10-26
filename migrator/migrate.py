@@ -170,6 +170,7 @@ class SpecContents(object):
         self._prep_steps = []
         self._prev_comments = []
         self._patch_comments = {}
+        self._svndir = False
 
     def replace_vars(self, varstr):
         """return the string with %define'd variables replaced inline
@@ -217,6 +218,7 @@ class SpecContents(object):
 
     def parse_in(self, fp, mstep):
         seclist, line_fn = self._init_section_('')
+        self._svndir = mstep._parent._svndir
         
         for line in fp:
             if not line:
@@ -435,10 +437,56 @@ class SpecContents(object):
             _logger.error("Patch %s not found for line: %s", pmp.group(1), line.strip())
             raise RuntimeError
         
-        # TODO detect git patches
-        self._prep_steps.append((Patch, dict(source=self._patches[patch_num], patch_level=patch_level)))
+        # detect git patches:
+        git_from_re = re.compile(r'From ([0-9a-f]{40}) ')
+        git_log_re = re.compile(r'commit ([0-9a-f]{40})')
+        try:
+            fp = None
+            patch_path = self._patches[patch_num]
+            if '/' in patch_path:
+                patch_path = patch_path.rsplit('/',1)[1]
+            patch_fullpath = os.path.join(self._svndir, 'SOURCES', patch_path)
+            fp = open(patch_fullpath, 'rb')
+            first_line = fp.readline()
+            
+            if git_log_re.match(first_line):
+                # it comes from 'git log --patch-with-stat' , which must be translated to 'git am'
+                _logger.debug("Patch %s seems to come from git, using 'git am'", patch_path)
+                self._prep_steps.append((Git_Log_Patch, dict(source=patch_path)))
+                return
+            elif git_from_re.match(first_line):
+                # It is a git patch
+                _logger.debug("Patch %s seems to come from git, using 'git am'", patch_path)
+                self._prep_steps.append((Git_Am_Patch, dict(source=patch_path)))
+                return
+            elif first_line.startswith(('diff ', '---', 'Index:')):
+                # regular diff patch
+                pass
+            else:
+                _logger.info('Patch "%s" starts with: %s', patch_path, first_line[:60])
+                if not self._patch_comments.get(patch_num, None):
+                    # try to read first lines of patch as comment
+                    n = 1
+                    comment_lines = []
+                    while n < 100:
+                        comment_lines.append(first_line.rstrip('\n'))
+                        first_line = fp.readline()
+                        if first_line.startswith(('diff ', '--- ')):
+                            break
+                        n += 1
+                    comment_lines += ["", "patch: %s from upstream" % self._patches[patch_num]]
+                    self._patch_comments[patch_num] = comment_lines
+
+        except Exception:
+            _logger.warning("Cannot auto-detect patch: %s", patch_path, exc_info=True)
+        finally:
+            if fp:
+                fp.close()
+
+        # regular patch:
+        self._prep_steps.append((Patch, dict(source=patch_path, patch_level=patch_level)))
         self._prep_steps.append((Git_Commit_Source, dict(msg=self._patch_comments.get(patch_num, \
-                    "apply patch: %s" % self._patches[patch_num]) )))
+                    "apply patch: %s" % patch_path) )))
 
     def _init_section_prep(self, section_id, rest):
         assert not rest, "prep: %s" % rest
@@ -646,7 +694,7 @@ class Patch(MWorker):
     _name = "patch"
     
     def __init__(self, parent, source, patch_level=0):
-        """Untar `source` at path name `pname`
+        """Apply patch from `source`
         """
         super(Patch, self).__init__(parent)
         self.source = source
@@ -659,6 +707,71 @@ class Patch(MWorker):
         subprocess.check_call(['patch', '-p%d' % self.patch_level, '-F0', '--no-backup-if-mismatch', '-i',
                     os.path.join(self._parent._svndir, 'SOURCES', self.source)],
                 cwd=self._parent._gitdir)
+
+class Git_Am_Patch(MWorker):
+    _name = "git am"
+
+    def __init__(self, parent, source):
+        """Apply git mailbox patch
+          
+          see: `git am`
+        """
+        super(Git_Am_Patch, self).__init__(parent)
+        self.source = source
+
+    def work(self):
+        _logger.info("Applying mailbox patch: %s in %s", self.source, self._parent._gitdir)
+        subprocess.check_call(['git', 'am', os.path.join(self._parent._svndir, 'SOURCES', self.source)],
+                cwd=self._parent._gitdir)
+
+class Git_Log_Patch(MWorker):
+    _name = "git apply patch"
+
+    def __init__(self, parent, source):
+        """Apply git mailbox patch
+          
+          see: `git am`
+        """
+        super(Git_Log_Patch, self).__init__(parent)
+        self.source = source
+
+    def work(self):
+        _logger.info("Applying log patch: %s in %s", self.source, self._parent._gitdir)
+        patch_fullpath = os.path.join(self._parent._svndir, 'SOURCES', self.source)
+        try:
+            fp = None
+            fp = open(patch_fullpath, 'rb')
+            if not fp.readline().startswith('commit '):
+                raise ValueError("First line does not start with 'commit'")
+            
+            author = date = False
+            # read first 3 lines: author and date
+            for line in fp:
+                if not line.strip():
+                    break
+                if line.startswith('Author: '):
+                    assert not author
+                    author = line[8:].strip()
+                elif line.startswith('Date: '):
+                    assert not date
+                    date = line[6:].strip()
+                else:
+                    _logger.warning("Invalid line: %s", line[:60].rstrip())
+                    break
+
+            message = ''
+            # next lines, the message, all lines have 4 spaces indent
+            for line in fp:
+                if not line.startswith('    '):
+                    break
+                message += line[4:]
+        finally:
+            if fp:
+                fp.close()
+
+        subprocess.check_call(['git', 'apply', '--index', patch_fullpath ], cwd=self._parent._gitdir)
+        subprocess.check_call(['git', 'commit', '--author', author, '--date', date,
+                                '-m', message], cwd=self._parent._gitdir )
 
 class Migrator(object):
     
