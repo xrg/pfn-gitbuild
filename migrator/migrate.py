@@ -157,6 +157,7 @@ class SpecContents(object):
 
     _setup_re = re.compile(r'^\s*%setup\s+(.*)$')
     _patch_re = re.compile(r'^\s*%patch([0-9]+)\s+(.*)$')
+    _apply_patches_re = re.compile(r'^\s*%apply_patches\s*$')
 
     def __init__(self):
         self.sections = {}
@@ -410,7 +411,13 @@ class SpecContents(object):
             patch_num = int(pmp.group(1))
             self._prep_patch(patch_num, patch_level)
             return
-   
+
+        if self._apply_patches_re.match(line):
+            _logger.debug("Apply all patches: %r", self._patches.keys())
+            for pnum in sorted(self._patches.keys()):
+                self._prep_patch(pnum)
+            return
+
         if line.strip().startswith('%'):
             if line.startswith(('%if', '%else', '%endif')):
                 # TODO: nested %if processing
