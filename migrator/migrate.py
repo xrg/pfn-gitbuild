@@ -150,6 +150,7 @@ class SpecContents(object):
     _define_re = re.compile(r'^\s*%define\s+(\w+)\s+(.*)$')
     _header_re = re.compile(r'^(\w+)\s*:\s+(.*)$')
     _varre = re.compile(r'%(?:(?:\{(\w+)\})|(\w+))')
+    _condre = re.compile(r'%\{\?(\!?\w+):(.+)\}')
 
     _vars_to_resolve = ['version', 'release', 'name']
     _vars_to_skip = ['version', 'release', 'name']
@@ -176,6 +177,9 @@ class SpecContents(object):
         """
         while True:
             oldstr = varstr
+            varstr = self._condre.sub(self._resolve_cond, varstr)
+            if oldstr != varstr:
+                continue
             varstr = self._varre.sub(self._resolve, varstr)
             if oldstr == varstr:
                 break
@@ -192,6 +196,23 @@ class SpecContents(object):
             return r
         else:
             return orig
+
+    def _resolve_cond(self, varm):
+        """Resolve RPM conditional, like %{?group1:group2}
+        """
+        cond = varm.group(1)
+        inverse = False
+        if cond.startswith('!'):
+            inverse = True
+            cond = cond[1:]
+
+        r = self.variables.get(cond, None)
+        if inverse:
+            r = not r
+        if r:
+            return varm.group(2)
+        else:
+            return ''
 
     def parse_in(self, fp, mstep):
         seclist, line_fn = self._init_section_('')
