@@ -534,10 +534,18 @@ class Set_Paths(MWorker):
 
     def work(self):
         hometmp = os.path.expanduser('~/tmp')
-        self._parent._svndir = tempfile.mkdtemp( prefix="mga_migr_%s_" % self._parent._project, dir=hometmp)
+        if self._parent._svndir:
+            _logger.debug("Examining existing svndir: %s", self._parent._svndir)
+            if os.path.isdir(os.path.join(self._parent._svndir, self._parent._project, '.svn')):
+                _logger.info("Re-using SVN data from %s", self._parent._svndir)
+            else:
+                _logger.error('Path %s/%s/.svn does not exist', self._parent._svndir, self._parent._project)
+                raise Exception("Previous SVN directory not found")
+        else:
+            self._parent._svndir = tempfile.mkdtemp( prefix="mga_migr_%s_" % self._parent._project, dir=hometmp)
         self._parent._gitdir = tempfile.mkdtemp( prefix="mga_migr_%s_" % self._parent._project, dir=hometmp)
-        _logger.debug("Temporary path for SVN will be: %s", self._parent._svndir)
-        _logger.debug("Temporary path for GIT will be: %s", self._parent._gitdir)
+        _logger.info("Temporary path for SVN will be: %s", self._parent._svndir)
+        _logger.info("Temporary path for GIT will be: %s", self._parent._gitdir)
 
 class Checkout(MWorker):
     _name = "checkout from SVN"
@@ -549,6 +557,9 @@ class Checkout(MWorker):
         self._mga_trunk = opts.mga_trunk_dir
 
     def work(self):
+        if os.path.isdir(os.path.join(self._parent._svndir, self._parent._project, '.svn')):
+            _logger.info("SVN directory is already here, NOT checking out")
+            return
         global opts
         name = self._parent._project
         if self._mga_trunk:
@@ -559,6 +570,15 @@ class Checkout(MWorker):
             name = self._mga_repo + '/' + name
         subprocess.check_call( ['mgarepo', 'co', name ], cwd=self._parent._svndir)
         _logger.debug('Checked out %s to %s .', self._parent._project, self._parent._svndir)
+        self._parent._svndir = os.path.join(self._parent._svndir, self._parent._project)
+
+class Set_SVNdir(MWorker):
+    _name = "set SVN project dir"
+
+    def work(self):
+        if not os.path.isdir(os.path.join(self._parent._svndir, self._parent._project, '.svn')):
+            _logger.error("SVN directory is missing, NOT checking out")
+            raise Exception("missing svn dir")
         self._parent._svndir = os.path.join(self._parent._svndir, self._parent._project)
 
 class Git_Init(MWorker):
@@ -775,17 +795,29 @@ class Git_Log_Patch(MWorker):
 
 class Migrator(object):
     
-    def __init__(self, project):
+    def __init__(self, project, old_svndir=None):
         self._project = project
         self._steps = []
-        self._svndir = None
+        self._svndir = old_svndir
         self._gitdir = None
         self._context = {}
         self._spec = None
         self._spec_path = None
-        for sclass in (Set_Paths, Checkout, Git_Init, Parse_Spec, Placeholder, \
+        edit_spec = ()
+        global opts
+        seq = [Set_Paths,]
+        if old_svndir:
+            seq.append(Set_SVNdir)
+        else:
+            seq.append(Checkout)
+        seq.append(Git_Init)
+        if opts.edit_spec:
+            seq.append(Edit_spec)
+        seq += [ Parse_Spec, Placeholder, \
                     Git_Mga_branch, Chose_Spec_Path, Copy_Spec, Git_Commit_Spec, \
-                    Placeholder, Gitify_Spec, Git_Commit_Spec2):
+                    Placeholder, Gitify_Spec, Git_Commit_Spec2 ]
+        _logger.debug("sequence of steps for new migrator: %r", seq)
+        for sclass in seq:
             assert issubclass(sclass, MWorker), sclass
             self._steps.append(sclass(self))
 
@@ -837,13 +869,26 @@ if copt.show_mode:
         print "    remaining steps:"
         for n, s in enumerate(mig._steps):
             print "    %2d. %s" %(n, s)
+        print "\nSVN sources path: %s\nGit repo path:    %s" %(mig._svndir, mig._gitdir)
         print
 
     sys.exit(0)
 
 for project in args:
     try:
-        migs.append(Migrator(project))
+        if os.sep in project:
+            # must be the SVN dir of some previous migration
+            if project.endswith(os.sep):
+                project = project[:-1]
+            oldsvn1 = project
+            oldsvn, project = project.rsplit(os.sep, 1)
+            if not os.path.isdir(os.path.join(oldsvn, project, '.svn')):
+                raise Exception("Path %s/%s/.svn does not exist" %( oldsvn, project))
+            # clean existing migrators for the same dir
+            migs = filter(lambda m: (m._svndir != oldsvn) and (m._svndir != oldsvn1), migs)
+            migs.append(Migrator(project, oldsvn))
+        else:
+            migs.append(Migrator(project))
     except Exception:
         _logger.exception("Cannot add migrator for \"%s\" project", project)
 
