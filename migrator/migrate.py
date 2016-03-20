@@ -80,6 +80,8 @@ if True:
                         help="Number of steps to skip")
     pgroup1.add_option("--one-step", action='store_true', default=False,
                         help="Perform one step and then stop")
+    pgroup1.add_option("--edit-spec", action='store_true', default=False,
+                        help="Stop before parsing the SPEC file for manual edit")
     parser.add_option_group(pgroup1)
 
     pgroup3 = optparse.OptionGroup(parser, 'SVN repository options')
@@ -683,6 +685,12 @@ class Placeholder(MWorker):
     def work(self):
         raise RuntimeError("A placeholder cannot ever work. You forgot to replace it.")
 
+class Edit_spec(MWorker):
+    _name = "edit the spec file"
+
+    def work(self):
+        return 'break'
+
 class Gitify_Spec(MWorker):
     _name = "gitify the spec file"
     
@@ -837,8 +845,9 @@ class Migrator(object):
     def work(self):
         step = self._steps[0]
         _logger.debug('Trying to %s at migrator of %s', step, self._project)
-        step.work()
+        r = step.work()
         self._steps.pop(0)
+        return r
     
     def skip(self):
         self._steps.pop(0)
@@ -913,7 +922,9 @@ for mig in migs:
             mig.skip()
             steps_skip -= 1
         try:
-            mig.work()
+            r = mig.work()
+            if r == 'break':
+                break
         except subprocess.CalledProcessError, e:
             _logger.error("Cannot do %r: %s", mig, e)
             break
