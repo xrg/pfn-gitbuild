@@ -172,7 +172,9 @@ class SpecContents(object):
         self._prep_steps = []
         self._prev_comments = []
         self._patch_comments = {}
+        self._source_comments = {}
         self._svndir = False
+        self._used_sources = {}
 
     def replace_vars(self, varstr):
         """return the string with %define'd variables replaced inline
@@ -189,9 +191,30 @@ class SpecContents(object):
                 break
         return varstr
 
-    def _resolve(self, varm):
+    def _resolve_sources(self, varm):
         orig = varm.group(1) or varm.group(2)
-        r = self.variables.get(orig, None)
+        if not orig.startswith('SOURCE'):
+            return varm.group(0)
+        sno = orig[6:]
+        if sno not in self._sources:
+            raise KeyError("SOURCE%s not found in declared sources" % sno)
+        if sno not in self._used_sources:
+            src = os.path.basename(self._sources[sno])
+            self._used_sources[sno] = os.path.join('contrib', 'mageia', src)
+            self._prep_steps.append((Copy_Source, dict(source=src, dest=self._used_sources[sno])))
+            self._prep_steps.append((Git_Commit_Source, dict(msg=self._source_comments.get(sno, \
+                    "source from Mageia: %s" % sno) )))
+
+        return self._used_sources[sno]
+
+    def _resolve(self, varm):
+        orig = varm.group(0)
+        var = varm.group(1) or varm.group(2)
+        new = self._resolve_sources(varm)
+        if new != orig:
+            return new
+
+        r = self.variables.get(var, None)
         if r is None:
             return orig
         elif r is True:
@@ -330,6 +353,8 @@ class SpecContents(object):
                         section.append('Source1:\t%{name}-gitrpm.version\n')
                         section.append('Source2:\t%{name}-changelog.gitrpm.txt\n')
                     self._sources[src_num] = self.replace_vars(hvalue).strip().rsplit('/', 1)[-1]
+                    if hdr_comments:
+                        self._source_comments[src_num] = hdr_comments
                     return
                 elif hvar.startswith('Patch'):
                     patch_num = int(hvar[5:].strip())
@@ -343,6 +368,12 @@ class SpecContents(object):
     def _proc_line_plain(self, line, section):
         """Just append lines to the section buffer
         """
+        section.append(line)
+
+    def _proc_line_sources(self, line, section):
+        """ Replace "sources" variables, then append to section buffer
+        """
+        line = self._varre.sub(self._resolve_sources, line)
         section.append(line)
 
     def _init_section_package(self, section_id, rest):
@@ -428,6 +459,8 @@ class SpecContents(object):
                 pass
             else:
                 _logger.warning("Unknown line in setup: %s", line.strip())
+        
+        line = self._varre.sub(self._resolve_sources, line)
         seclines.append(line)
 
     def _prep_patch(self, patch_num, patch_level=1):
@@ -498,12 +531,12 @@ class SpecContents(object):
     def _init_section_build(self, section_id, rest):
         assert not rest, "build: %s" % rest
         
-        return self.sections.setdefault(section_id, []), self._proc_line_plain
+        return self.sections.setdefault(section_id, []), self._proc_line_sources
 
     def _init_section_install(self, section_id, rest):
         assert not rest, "install: %s" % rest
         
-        return self.sections.setdefault(section_id, []), self._proc_line_plain
+        return self.sections.setdefault(section_id, []), self._proc_line_sources
 
     def _init_section_files(self, section_id, rest):
         assert not rest, "files: %s" % rest
@@ -671,6 +704,25 @@ class Copy_Spec(MWorker):
         shutil.copy(os.path.join(self._parent._svndir, 'SPECS', self._parent._project + '.spec'),
                 os.path.join(self._parent._gitdir, self._parent._spec_path))
 
+class Copy_Source(MWorker):
+    _name = "copy source script into git"
+    
+    def __init__(self, parent, source, dest):
+        """ Copy SOURCES/`source` into git/`dest`
+        """
+        super(Copy_Source, self).__init__(parent)
+        assert source
+        assert dest
+        self.source = source
+        self.dest = dest
+
+    def work(self):
+        if '/' in self.source:
+            self.source = os.path.basename(self.source)
+        _logger.info("Copying source: %s", self.source)
+        shutil.copy(os.path.join(self._parent._svndir, 'SOURCES', self.source),
+                    os.path.join(self._parent._gitdir, self.dest))
+    
 class Git_Commit_Spec(MWorker):
     _name = "commit the spec file in git"
 
