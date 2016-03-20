@@ -266,13 +266,6 @@ class SpecContents(object):
 
             line_fn(line, seclist)
 
-        #print "RPM spec:", self.sections
-        #print "Defines:", self.variables
-        #print "Headers:", self.spec_vars
-        #print "Sources:", self._sources
-        #print "Patches:", self._patches
-        #print "Prep steps:", self._prep_steps
-
     def gitify_out(self, fp):
 
         for section in self.section_order:
@@ -525,32 +518,26 @@ class SpecContents(object):
 
     def _init_section_prep(self, section_id, rest):
         assert not rest, "prep: %s" % rest
-        
         return self.sections.setdefault(section_id, []), self._proc_line_prep
 
     def _init_section_build(self, section_id, rest):
         assert not rest, "build: %s" % rest
-        
         return self.sections.setdefault(section_id, []), self._proc_line_sources
 
     def _init_section_install(self, section_id, rest):
         assert not rest, "install: %s" % rest
-        
         return self.sections.setdefault(section_id, []), self._proc_line_sources
 
     def _init_section_files(self, section_id, rest):
         assert not rest, "files: %s" % rest
-        
         return self.sections.setdefault(section_id, []), self._proc_line_plain
 
     def _init_section_changelog(self, section_id, rest):
         assert not rest, "changelog: %s" % rest
-        
         return self.sections.setdefault(section_id, []), self._proc_line_plain
 
     def _init_section_clean(self, section_id, rest):
         assert not rest, "clean: %s" % rest
-        
         return self.sections.setdefault(section_id, []), self._proc_line_plain
 
 class MWorker(object):
