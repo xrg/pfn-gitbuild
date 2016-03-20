@@ -44,10 +44,10 @@ case "$1" in
 		GET_ONLY=y
 		shift 2
 		;;
-    -S)
-        # OpenSSL versioning: "v1.2.3f" ...
-        UGLY_REGEXP='^v\?\([0-9\.]*\)-\?\([a-z]\+[0-9]*\)\?-\([0-9]\+\w\)\(-g.*\)\?$'
-        shift 1;
+        -S)
+                # OpenSSL versioning: "v1.2.3f" ...
+                UGLY_REGEXP='^v\?\([0-9\.]*\)-\?\([a-z]\+[0-9]*\)\?-\([0-9]\+\w\)\(-g.*\)\?$'
+                shift 1;
         ;;
 	-0)
 		DO_ZEROEXTRA=y
