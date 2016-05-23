@@ -24,6 +24,7 @@ Source2:	%{name}-changelog.gitrpm.txt
 
 #BuildRequires:	gettext
 Requires(pre): rpm-build
+Requires:       git-core
 %if %{_target_vendor} == redhat
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-buildroot
 %endif
