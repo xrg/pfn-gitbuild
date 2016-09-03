@@ -15,7 +15,7 @@ OUTDIR="."
 BOOTSTRAP=
 GET_ONLY=n
 DO_ZEROEXTRA=
-UGLY_REGEXP='^v\?\([0-9\.]*\)-\?\([a-z]\+[0-9]*\)\?-\([0-9]\+\)\(-g.*\)\?$'
+UGLY_REGEXP='^v?([0-9\.]*)-?([a-z]+[0-9]*)?-([0-9]+)(-g.*)?$'
 
 while [ -n "$1" ] ; do
 case "$1" in
@@ -46,7 +46,7 @@ case "$1" in
 		;;
         -S)
                 # OpenSSL versioning: "v1.2.3f" ...
-                UGLY_REGEXP='^v\?\([0-9\.]*\)-\?\([a-z]\+[0-9]*\)\?-\([0-9]\+\w\)\(-g.*\)\?$'
+                UGLY_REGEXP='^v?([0-9\.]*)-?([a-z]+[0-9]*)?-([0-9]+\w)(-g.*)?$'
                 shift 1;
         ;;
 	-0)
@@ -60,7 +60,7 @@ done
 
 case "$REPONAME" in 
     openssl)
-        UGLY_REGEXP='^v\?\([0-9\.]*\w\?\)-\?\([a-z]\+[0-9]*\)\?-\([0-9]\+\)\(-g.*\)\?$'
+        UGLY_REGEXP='^v?([0-9\.]*\w?)-?([a-z]+[0-9]*)?-([0-9]+)(-g.*)?$'
         ;;
 esac
 
@@ -74,15 +74,15 @@ if [ "$GET_ONLY" != "y" ] && [ -d "$GITDIR" ] ; then
 	VERSION_HEAD=$(git --git-dir="$GITDIR" rev-parse "$GIT_HEAD")
 
 	VERSION_VERSION=$(echo $VERSION_STRING | \
-		sed "s/$UGLY_REGEXP/\1/;s/-//;s/^v//")
+		sed -r "s/$UGLY_REGEXP/\1/;s/-//;s/^v//")
 
 	VERSION_RELEASE=$(echo $VERSION_STRING | \
-		grep '\-g.\+$' | \
-		sed "s/$UGLY_REGEXP/\3/")
+		grep -E '\-g.+$' | \
+		sed -r "s/$UGLY_REGEXP/\3/")
 
 	VERSION_EXTRA=$(echo $VERSION_STRING | \
-        grep '\-g.\+$' | \
-		sed "s/$UGLY_REGEXP/\2/" )
+        grep -E '\-g.+$' | \
+		sed -r "s/$UGLY_REGEXP/\2/" )
 		
 cat '-' <<EOF > "$OUTDIR"/$REPONAME-gitrpm.version
 Version: $VERSION_VERSION
