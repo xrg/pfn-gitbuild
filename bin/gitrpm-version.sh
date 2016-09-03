@@ -63,6 +63,10 @@ case "$REPONAME" in
     openssl)
         UGLY_REGEXP='^v?([0-9\.]*\w?)-?([a-z]+[0-9]*)?-([0-9]+)(-g.*)?$'
         ;;
+    systemd)
+         UGLY_REGEXP='^v?([0-9\.]*)()-([0-9]+)(-g.*)?$'
+         VERSION_MATCH='v[0-9]*'
+        ;;
 esac
 
 	
