@@ -197,7 +197,12 @@ class SpecContents(object):
             return varm.group(0)
         sno = orig[6:]
         if sno not in self._sources:
-            raise KeyError("SOURCE%s not found in declared sources" % sno)
+            for key in self._sources.keys():
+                if int(key) == int(sno):
+                    sno = key
+                    break
+            else:
+                raise KeyError("SOURCE%s not found in declared sources" % sno)
         if sno not in self._used_sources:
             src = os.path.basename(self._sources[sno])
             self._used_sources[sno] = os.path.join('contrib', 'mageia', src)
