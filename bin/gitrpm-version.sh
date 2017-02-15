@@ -54,6 +54,10 @@ case "$1" in
 		DO_ZEROEXTRA=y
 		shift 1
 		;;
+    *)
+        echo "Bad option: $1" >&2
+        exit 1
+        ;;
 esac
 done
 
