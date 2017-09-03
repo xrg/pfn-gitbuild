@@ -158,6 +158,7 @@ class SpecContents(object):
     _vars_to_skip = ['version', 'release', 'name']
 
     _setup_re = re.compile(r'^\s*%setup\s+(.*)$')
+    _autosetup_re = re.compile(r'^\s*%autosetup\s+(.*)$')
     _patch_re = re.compile(r'^\s*%patch([0-9]+)\s+(.*)$')
     _apply_patches_re = re.compile(r'^\s*%apply_patches\s*$')
 
@@ -422,6 +423,7 @@ class SpecContents(object):
             else:
                 self._prep_steps.append((Git_Commit_Source, dict(msg="Add source from %s" % source)))
             return
+
         pmp = self._patch_re.match(line)
         if pmp:
             args = self.replace_vars(pmp.group(2)).strip().split()
@@ -446,6 +448,44 @@ class SpecContents(object):
             return
 
         if self._apply_patches_re.match(line):
+            _logger.debug("Apply all patches: %r", self._patches.keys())
+            for pnum in sorted(self._patches.keys()):
+                self._prep_patch(pnum)
+            return
+        
+        smp2 = self._autosetup_re.match(line)
+        if smp2:
+            args = self.replace_vars(smp2.group(1)).strip().split()
+            # print "args:", args
+            name = None
+            source = self._sources.get('', None)
+            if source is None:
+                source = self._sources.get('0', None)
+            while args:
+                r0 = args.pop(0)
+                if not r0:
+                    continue
+                elif r0 == '-q':
+                    pass
+                elif r0 == '-n':
+                    name = args.pop(0)
+                elif r0 == '-S':
+                    vcs = args.pop(0)
+                    if vcs != 'git':
+                        _logger.warning("Found %%autosetup -S %s , which may fail", vcs)
+                else:
+                    _logger.warning("Unknown switch to %%autosetup: '%s'", r0)
+            assert source, "No source to extract! %r" % self._sources.keys()
+            _logger.debug("Will extract source from %s, name=%s", source, name)
+            self._prep_steps.append((Untar, dict(source=source, pname=name)))
+            if len(self._prep_steps) == 1:
+                self._prep_steps.append((Git_Commit_Source, dict(msg="Initial source from Mageia %s" % source)))
+                self._prep_steps.append((Git_tag, dict(tag='v'+self.spec_vars.get('version', '0.0'))))
+                self._prep_steps.append((Placeholder, {}))
+                seclines.append('%git_get_source\n')
+                seclines.append('%setup -q\n')
+            else:
+                self._prep_steps.append((Git_Commit_Source, dict(msg="Add source from %s" % source)))
             _logger.debug("Apply all patches: %r", self._patches.keys())
             for pnum in sorted(self._patches.keys()):
                 self._prep_patch(pnum)
