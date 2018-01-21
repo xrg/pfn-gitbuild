@@ -444,13 +444,13 @@ class SpecContents(object):
                 else:
                     _logger.warning("Unknown switch to %%patch: '%s'", r0)
             patch_num = int(pmp.group(1))
-            self._prep_patch(patch_num, patch_level)
+            self._prep_patch(patch_num, line=line, patch_level=patch_level)
             return
 
         if self._apply_patches_re.match(line):
             _logger.debug("Apply all patches: %r", self._patches.keys())
             for pnum in sorted(self._patches.keys()):
-                self._prep_patch(pnum)
+                self._prep_patch(pnum, line=line)
             return
 
         smp2 = self._autosetup_re.match(line)
@@ -488,7 +488,7 @@ class SpecContents(object):
                 self._prep_steps.append((Git_Commit_Source, dict(msg="Add source from %s" % source)))
             _logger.debug("Apply all patches: %r", self._patches.keys())
             for pnum in sorted(self._patches.keys()):
-                self._prep_patch(pnum)
+                self._prep_patch(pnum, line=line)
             return
 
         if line.strip().startswith('%'):
@@ -501,15 +501,18 @@ class SpecContents(object):
         line = self._varre.sub(self._resolve_sources, line)
         seclines.append(line)
 
-    def _prep_patch(self, patch_num, patch_level=1):
+    def _prep_patch(self, patch_num, line='', patch_level=1):
         """Push patch in our _prep_steps
         
             Will auto-detect git patches and 'am' them instead
         """
         if patch_num not in self._patches:
-            _logger.error("Patch %s not found for line: %s", pmp.group(1), line.strip())
-            raise RuntimeError
-        
+            _logger.error("Patch %s not found for line: %s", patch_num, line.strip())
+            raise RuntimeError("Patch not found")
+
+        if patch_level != 1:
+            raise NotImplementedError("patch level %s" % patch_level)
+
         # detect git patches:
         git_from_re = re.compile(r'From ([0-9a-f]{40}) ')
         git_log_re = re.compile(r'commit ([0-9a-f]{40})')
