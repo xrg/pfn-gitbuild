@@ -159,6 +159,7 @@ class SpecContents(object):
 
     _setup_re = re.compile(r'^\s*%setup\s+(.*)$')
     _autosetup_re = re.compile(r'^\s*%autosetup(\s+.*)$')
+    _autopatch_re = re.compile(r'^\s*%autopatch(\s+.*)$')
     _patch_re = re.compile(r'^\s*%patch([0-9]+)\s+(.*)$')
     _apply_patches_re = re.compile(r'^\s*%apply_patches\s*$')
 
@@ -489,6 +490,27 @@ class SpecContents(object):
             _logger.debug("Apply all patches: %r", self._patches.keys())
             for pnum in sorted(self._patches.keys()):
                 self._prep_patch(pnum, line=line)
+            return
+
+        smp2 = self._autopatch_re.match(line)
+        if smp2:
+            args = self.replace_vars(smp2.group(1)).strip().split()
+            # print "args:", args
+            patch_level = 1
+            while args:
+                r0 = args.pop(0)
+                if not r0:
+                    continue
+                elif r0 == '-p':
+                    patch_level = int(args.pop(0))
+                elif r0.startswith('-p'):
+                    patch_level = int(r0[2:])
+                else:
+                    _logger.warning("Unknown switch to %%autosetup: '%s'", r0)
+                    raise NotImplementedError(line)
+            _logger.debug("Apply all patches: %r", self._patches.keys())
+            for pnum in sorted(self._patches.keys()):
+                self._prep_patch(pnum, line=line, patch_level=patch_level)
             return
 
         if line.strip().startswith('%'):
