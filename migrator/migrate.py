@@ -158,7 +158,7 @@ class SpecContents(object):
     _vars_to_skip = ['version', 'release', 'name']
 
     _setup_re = re.compile(r'^\s*%setup\s+(.*)$')
-    _autosetup_re = re.compile(r'^\s*%autosetup\s+(.*)$')
+    _autosetup_re = re.compile(r'^\s*%autosetup(\s+.*)$')
     _patch_re = re.compile(r'^\s*%patch([0-9]+)\s+(.*)$')
     _apply_patches_re = re.compile(r'^\s*%apply_patches\s*$')
 
