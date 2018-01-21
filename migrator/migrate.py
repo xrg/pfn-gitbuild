@@ -452,7 +452,7 @@ class SpecContents(object):
             for pnum in sorted(self._patches.keys()):
                 self._prep_patch(pnum)
             return
-        
+
         smp2 = self._autosetup_re.match(line)
         if smp2:
             args = self.replace_vars(smp2.group(1)).strip().split()
@@ -497,7 +497,7 @@ class SpecContents(object):
                 pass
             else:
                 _logger.warning("Unknown line in setup: %s", line.strip())
-        
+
         line = self._varre.sub(self._resolve_sources, line)
         seclines.append(line)
 
@@ -855,7 +855,7 @@ class Git_Log_Patch(MWorker):
             fp = open(patch_fullpath, 'rb')
             if not fp.readline().startswith('commit '):
                 raise ValueError("First line does not start with 'commit'")
-            
+
             author = date = False
             # read first 3 lines: author and date
             for line in fp:
