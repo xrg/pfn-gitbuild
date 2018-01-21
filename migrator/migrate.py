@@ -561,8 +561,8 @@ class SpecContents(object):
 
         # regular patch:
         self._prep_steps.append((Patch, dict(source=patch_path, patch_level=patch_level)))
-        self._prep_steps.append((Git_Commit_Source, dict(msg=self._patch_comments.get(patch_num, \
-                    "apply patch: %s" % patch_path) )))
+        self._prep_steps.append((Git_Commit_Source, dict(msg=self._patch_comments.get(patch_num, '') \
+                    or "apply patch: %s" % patch_path) ))
 
     def _init_section_prep(self, section_id, rest):
         assert not rest, "prep: %s" % rest
@@ -710,6 +710,8 @@ class Git_Commit_Source(MWorker):
     def work(self):
         if isinstance(self._msg, list):
             self._msg = '\n'.join(self._msg)
+        elif not self._msg:
+            self._msg = "Apply patch"
         subprocess.check_call(['git', 'add', '--all'], cwd=self._parent._gitdir)
         subprocess.check_call(['git', 'commit', '--no-verify', '-m', self._msg], cwd=self._parent._gitdir)
 
