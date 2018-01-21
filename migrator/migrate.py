@@ -738,7 +738,23 @@ class Git_Commit_Source(MWorker):
         elif not self._msg:
             self._msg = "Apply patch"
         subprocess.check_call(['git', 'add', '--all'], cwd=self._parent._gitdir)
+
+        # check for untracked files. This may mean .gitignore is too greedy
+        # It would be a mistake for the .tar (or patches) to contain files
+        # that are not commited in git. They would be lost.
+        untracked = subprocess.check_output(['git', 'ls-files', '-o'],
+                                            cwd=self._parent._gitdir)
+        untracked = filter(None, untracked.split('\n'))
+
+        # Then, try to commit anyway..
         subprocess.check_call(['git', 'commit', '--no-verify', '-m', self._msg], cwd=self._parent._gitdir)
+
+        if untracked:  # .. and stop if there is untracked files
+            _logger.error("Untracked files are still in the source repo:%s",
+                            ''.join(['\n\t' + s for s in untracked[:10]]))
+            _logger.info("Please adjust your .gitignore and manually add a commit here")
+            return 'break'
+
 
 class Git_Mga_branch(MWorker):
     _name = "create a 'mageia' branch"
