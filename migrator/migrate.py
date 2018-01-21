@@ -517,8 +517,11 @@ class SpecContents(object):
             if line.startswith(('%if', '%else', '%endif')):
                 # TODO: nested %if processing
                 pass
+            elif line.startswith('%define'):
+                pass
             else:
                 _logger.warning("Unknown line in setup: %s", line.strip())
+                raise NotImplementedError(line)
 
         line = self._varre.sub(self._resolve_sources, line)
         seclines.append(line)
